@@ -13,7 +13,10 @@ use Traversable;
 use TypeError;
 
 /**
- * A mutable, single-use sequence; cloning is prohibited.
+ * A mutable, single-use sequence; cloning is prohibited. Starting iteration or
+ * any terminal operation consumes the sequence immediately. It cannot be
+ * reused after early termination or an exception. Source and callback
+ * exceptions are propagated unchanged.
  *
  * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:kan-defect
@@ -203,6 +206,133 @@ final class Sequence implements IteratorAggregate
     }
 
     /**
+     * Consumes every output value and returns it with consecutive list keys.
+     * This operation finishes only when the resulting sequence is finite.
+     *
+     * @return list<T>
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     */
+    public function toArray(): array
+    {
+        $values = [];
+        foreach ($this->iterate($this->beginConsumption()) as $value) {
+            $values[] = $value;
+        }
+
+        return $values;
+    }
+
+    /**
+     * Consumes every output value into a fresh Collection, including for an
+     * empty result. This operation finishes only when the result is finite.
+     *
+     * @return Collection<T>
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     */
+    public function toCollection(): Collection
+    {
+        $values = [];
+        foreach ($this->iterate($this->beginConsumption()) as $value) {
+            $values[] = $value;
+        }
+
+        return Collection::from($values);
+    }
+
+    /**
+     * Consumes up to the first output value and returns null when no value is
+     * available. A stored null and an empty result both return null.
+     *
+     * @return T|null
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     */
+    public function first(): mixed
+    {
+        $values = $this->iterate($this->beginConsumption());
+        if (!$values->valid()) {
+            return null;
+        }
+
+        return $values->current();
+    }
+
+    /**
+     * Consumes every output value and returns the number produced by the
+     * pipeline. This operation finishes only when the result is finite.
+     *
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     */
+    public function count(): int
+    {
+        $count = 0;
+        foreach ($this->iterate($this->beginConsumption()) as $_value) {
+            ++$count;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Consumes values until the predicate returns actual bool true. The
+     * predicate receives each value as its only argument; an empty result is
+     * false.
+     *
+     * @param callable(T): bool $predicate
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     * @throws TypeError If the predicate returns a non-boolean value.
+     */
+    public function any(callable $predicate): bool
+    {
+        foreach ($this->iterate($this->beginConsumption()) as $value) {
+            if ($this->requireBoolean($predicate($value), 'any')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Consumes values until the predicate returns actual bool false. The
+     * predicate receives each value as its only argument; an empty result is
+     * true.
+     *
+     * @param callable(T): bool $predicate
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     * @throws TypeError If the predicate returns a non-boolean value.
+     */
+    public function all(callable $predicate): bool
+    {
+        foreach ($this->iterate($this->beginConsumption()) as $value) {
+            if (!$this->requireBoolean($predicate($value), 'all')) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Consumes every output value by applying step to state then value in
+     * sequence order. An empty result returns the original initial value.
+     *
+     * @template S
+     * @param S $initial
+     * @param callable(S, T): S $step
+     * @return S
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     */
+    public function fold(mixed $initial, callable $step): mixed
+    {
+        $state = $initial;
+        foreach ($this->iterate($this->beginConsumption()) as $value) {
+            $state = $step($state, $value);
+        }
+
+        return $state;
+    }
+
+    /**
      * Consumes the sequence immediately when called, resolving input
      * IteratorAggregate instances then. Values from the returned iterator are
      * read lazily. Source exceptions are propagated unchanged, and the
@@ -249,6 +379,15 @@ final class Sequence implements IteratorAggregate
         if ($count < 0) {
             throw new InvalidArgumentException('Count must be non-negative.');
         }
+    }
+
+    private function requireBoolean(mixed $result, string $operation): bool
+    {
+        if (!is_bool($result)) {
+            throw new TypeError('Sequence ' . $operation . ' predicate must return bool.');
+        }
+
+        return $result;
     }
 
     /**

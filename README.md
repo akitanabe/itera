@@ -35,7 +35,7 @@ $user = $usersById->get('u1');
 
 ### Sequence
 
-`Sequence<T>` は遅延評価される変換パイプラインです。`Collection` の `sequence()` または任意の `iterable` から生成できます。`map`、`filter`、`flatMap`、`take`、`drop` などの intermediate operator は、terminal operator が呼ばれるまで実行されません。
+`Sequence<T>` は mutable で一度だけ消費できる遅延変換パイプラインです。`Collection` の `sequence()` または任意の `iterable` から生成できます。`map`、`filter`、`flatMap`、`take`、`drop` は同じ `Sequence` を更新し、終端処理または `foreach` が始まるまで source や callback を実行しません。
 
 ```php
 $result = Sequence::from($users)
@@ -46,9 +46,11 @@ $result = Sequence::from($users)
     ->toCollection();
 ```
 
-`toCollection`、`toMap`、`first`、`count`、`any`、`all`、`reduce`、`fold` などが terminal operator です。評価時は中間配列を作らず、各要素をパイプラインの末尾まで流して可能な限り single-pass で処理します。`first` や `any` のように途中で結果が確定する操作は早期終了できます。
+終端処理は `toArray()`、`toCollection()`、`first()`、`count()`、`any()`、`all()`、`fold()`、`getIterator()` です。`foreach` でも最終出力を list key で順に取得できます。`getIterator()` は返した iterator を進める前でも、呼び出した時点で `Sequence` を使用済みにします。`first()`、`any()`、`all()` は結果が確定すると source の読み取りを停止し、`any()` と `all()` の predicate は実際の `bool` を返す必要があります。`fold($initial, $step)` は `step($state, $value)` を順に適用します。
 
-無限 `Sequence` を終端処理する場合は終了しない可能性があるため、必要に応じて `take` などで有限化します。
+どの終端処理も呼び出した時点で消費を開始します。source や callback の例外はそのまま伝播し、途中終了や例外の後を含め、消費を開始した `Sequence` は再利用できません。`map()` や `flatMap()` による同一インスタンス上の型変更は静的解析できますが、変更前に保持した別名参照の型には解析上の制限があります。
+
+`toArray()`、`toCollection()`、`count()`、`fold()` は結果を最後まで消費するため、無限 source では終了しません。必要に応じて先に `take()` で有限化します。
 
 ### 採用範囲
 

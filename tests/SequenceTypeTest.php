@@ -36,6 +36,21 @@ final class SequenceTypeTest extends TestCase
         self::assertSame([1.0, 2.0], iterator_to_array($floats));
     }
 
+    public function testTerminalResultTypesRemainVisibleToStaticAnalysis(): void
+    {
+        $sequence = Sequence::from([1, 2]);
+        $array = $sequence->toArray();
+        $sum = Sequence::from([1, 2])->fold(0.0, static fn(float $state, int $value): float => $state + $value);
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('list<int>', $array);
+            assertType('float', $sum);
+        }
+
+        self::assertSame([1, 2], $array);
+        self::assertSame(3.0, $sum);
+    }
+
     /** @return iterable<array{bool}> */
     public static function flags(): iterable
     {
