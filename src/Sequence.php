@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Itera;
 
-use Closure;
 use Generator;
 use InvalidArgumentException;
 use Iterator;
@@ -27,11 +26,14 @@ use TypeError;
  */
 final class Sequence implements IteratorAggregate
 {
-    /** @var iterable<T> */
+    /**
+     * Operations can change the element type of this same mutable sequence.
+     * @var iterable<mixed>
+     */
     private iterable $values;
 
-    /** @var Closure(iterable<mixed>): iterable<mixed> */
-    private Closure $pipeline;
+    /** @var iterable<mixed> */
+    private iterable $source;
 
     private bool $consumed = false;
 
@@ -40,8 +42,8 @@ final class Sequence implements IteratorAggregate
      */
     private function __construct(iterable $values)
     {
-        $this->values = $values;
-        $this->pipeline = static fn(iterable $source): iterable => $source;
+        $this->source = $values;
+        $this->values = $this->iterateSource();
     }
 
     /**
@@ -98,13 +100,7 @@ final class Sequence implements IteratorAggregate
     public function map(callable $mapper): self
     {
         $this->assertNotConsumed();
-        $previous = $this->pipeline;
-        $this->pipeline = function (iterable $source) use ($previous, $mapper): iterable {
-            /** @var iterable<T> $input */
-            $input = $previous($source);
-
-            return $this->mapValues($input, $mapper);
-        };
+        $this->values = $this->mapValues($this->pipelineValues(), $mapper);
 
         return $this;
     }
@@ -120,13 +116,7 @@ final class Sequence implements IteratorAggregate
     public function filter(callable $predicate): self
     {
         $this->assertNotConsumed();
-        $previous = $this->pipeline;
-        $this->pipeline = function (iterable $source) use ($previous, $predicate): iterable {
-            /** @var iterable<T> $input */
-            $input = $previous($source);
-
-            return $this->filterValues($input, $predicate);
-        };
+        $this->values = $this->filterValues($this->pipelineValues(), $predicate);
 
         return $this;
     }
@@ -148,13 +138,7 @@ final class Sequence implements IteratorAggregate
     public function flatMap(callable $mapper): self
     {
         $this->assertNotConsumed();
-        $previous = $this->pipeline;
-        $this->pipeline = function (iterable $source) use ($previous, $mapper): iterable {
-            /** @var iterable<T> $input */
-            $input = $previous($source);
-
-            return $this->flatMapValues($input, $mapper);
-        };
+        $this->values = $this->flatMapValues($this->pipelineValues(), $mapper);
 
         return $this;
     }
@@ -170,14 +154,7 @@ final class Sequence implements IteratorAggregate
     {
         $this->assertNotConsumed();
         $this->assertNonNegative($count);
-        $previous = $this->pipeline;
-        /**
-         * PHPStan 2.2 misreads the equivalent arrow function as void-returning.
-         * @mago-expect lint:prefer-arrow-function
-         */
-        $this->pipeline = function (iterable $source) use ($previous, $count): iterable {
-            return $this->takeValues($previous($source), $count);
-        };
+        $this->values = $this->takeValues($this->values, $count);
 
         return $this;
     }
@@ -193,14 +170,7 @@ final class Sequence implements IteratorAggregate
     {
         $this->assertNotConsumed();
         $this->assertNonNegative($count);
-        $previous = $this->pipeline;
-        /**
-         * PHPStan 2.2 misreads the equivalent arrow function as void-returning.
-         * @mago-expect lint:prefer-arrow-function
-         */
-        $this->pipeline = function (iterable $source) use ($previous, $count): iterable {
-            return $this->dropValues($previous($source), $count);
-        };
+        $this->values = $this->dropValues($this->values, $count);
 
         return $this;
     }
@@ -356,15 +326,33 @@ final class Sequence implements IteratorAggregate
         $this->assertNotConsumed();
         $this->consumed = true;
 
-        $source = $this->resolveSource($this->values);
+        // Deferring resolution until iteration would skip it for take(0).
+        $this->source = $this->resolveSource($this->source);
+
+        return $this->pipelineValues();
+    }
+
+    /**
+     * @return iterable<T>
+     */
+    private function pipelineValues(): iterable
+    {
         /**
-         * The mutable pipeline is deliberately type-erased between operations.
+         * Restore the current public element type after type-erased storage.
          * @var iterable<T> $values
          * @mago-expect lint:inline-variable-return
          */
-        $values = ($this->pipeline)($source);
+        $values = $this->values;
 
         return $values;
+    }
+
+    /**
+     * @return Generator<int, mixed, void, void>
+     */
+    private function iterateSource(): Generator
+    {
+        yield from $this->iterate($this->source);
     }
 
     private function assertNotConsumed(): void

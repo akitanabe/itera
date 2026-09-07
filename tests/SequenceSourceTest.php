@@ -81,15 +81,22 @@ final class SequenceSourceTest extends TestCase
                 return $this->source;
             }
         };
-        $sequence = Sequence::from($outer);
+        $mapped = [];
+        $sequence = Sequence::from($outer)->map(static function (mixed $value) use (&$mapped): mixed {
+            $mapped[] = $value;
+            return $value;
+        })->take(1);
 
         self::assertSame(0, $outer->getIteratorCalls);
         self::assertSame(0, $inner->getIteratorCalls);
+        self::assertSame([], $mapped);
         $iterator = $sequence->getIterator();
 
         self::assertSame(1, $outer->getIteratorCalls);
         self::assertSame(1, $inner->getIteratorCalls);
-        self::assertSame(['first', 'second'], iterator_to_array($iterator));
+        self::assertSame([], $mapped);
+        self::assertSame(['first'], iterator_to_array($iterator));
+        self::assertSame(['first'], $mapped);
         self::assertSame(1, $outer->getIteratorCalls);
         self::assertSame(1, $inner->getIteratorCalls);
     }
