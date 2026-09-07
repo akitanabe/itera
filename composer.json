@@ -1,0 +1,30 @@
+{
+  "name": "akitanabe/itera",
+  "description": "A PHP application.",
+  "type": "project",
+  "license": "MIT",
+  "require": {
+    "php": "^8.5"
+  },
+  "require-dev": {
+    "carthage-software/mago": "^1.30",
+    "phpstan/phpstan": "^2.1",
+    "phpunit/phpunit": "^12.2"
+  },
+  "scripts": {
+    "analyse": "phpstan analyse",
+    "test": "phpunit",
+    "lint": "mago lint",
+    "format": "mago format",
+    "format:check": "mago format --check",
+    "check": [
+      "@test",
+      "@analyse",
+      "@lint",
+      "@format:check"
+    ]
+  },
+  "config": {
+    "sort-packages": true
+  }
+}
