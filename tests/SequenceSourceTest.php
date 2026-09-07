@@ -101,6 +101,23 @@ final class SequenceSourceTest extends TestCase
         self::assertSame(1, $inner->getIteratorCalls);
     }
 
+    public function testResolvedSourceDoesNotKeepItsAggregateAliveAfterConsumptionStarts(): void
+    {
+        $source = new class implements IteratorAggregate {
+            public function getIterator(): Traversable
+            {
+                return new ArrayIterator([1]);
+            }
+        };
+        $sourceReference = \WeakReference::create($source);
+        $sequence = Sequence::from($source);
+        unset($source);
+
+        $iterator = $sequence->getIterator();
+        self::assertNull($sourceReference->get());
+        self::assertSame([1], iterator_to_array($iterator));
+    }
+
     public function testAnIteratorAggregateExceptionKeepsItsIdentityAndConsumesTheSequence(): void
     {
         $sourceException = new \RuntimeException('cannot create iterator');

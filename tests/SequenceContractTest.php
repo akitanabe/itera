@@ -62,6 +62,18 @@ final class SequenceContractTest extends TestCase
         $sequence->first();
     }
 
+    public function testCallbackIsReleasedAfterConsumptionCompletes(): void
+    {
+        $mapper = static fn(int $value): int => $value;
+        $mapperReference = \WeakReference::create($mapper);
+        $sequence = Sequence::from([1])->map($mapper);
+        unset($mapper);
+
+        self::assertSame([1], $sequence->toArray());
+
+        self::assertNull($mapperReference->get());
+    }
+
     /** @return iterable<string, array{callable(Sequence<mixed>): mixed}> */
     public static function instanceOperations(): iterable
     {
