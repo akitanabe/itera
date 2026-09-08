@@ -45,9 +45,9 @@ $result = Sequence::from($users)
     ->toCollection();
 ```
 
-`map()` と `filter()` の callback は値だけを受け取ります。`filter()` の predicate は実際の `bool` を返す必要があります。`until($predicate)` は最初に predicate が `true` を返した値までを含めて下流へ送り、その後の upstream の読み取りを停止します。一致する値がなければ最後まで値を送り、predicate は値だけを受け取り実際の `bool` を返す必要があります。
+`map()` と `filter()` の callback は値だけを受け取ります。`filter()`、`until()`、`skipUntil()` の predicate は静的には `bool` を返す契約ですが、実行時の判定は PHP の truthiness に従います。`until($predicate)` は最初に predicate が truthy と判定された値までを含めて下流へ送り、その後の upstream の読み取りを停止します。一致する値がなければ最後まで値を送ります。
 
-`skipUntil($predicate)` は最初に predicate が `true` を返した値を含め、それ以降の値を下流へ送り、最初の一致より前の値を捨てます。一致後は predicate を呼び出さず、一致する値がなければ空になります。両方の predicate は値だけを受け取り、実際の `bool` を返す必要があります。
+`skipUntil($predicate)` は最初に predicate が truthy と判定された値を含め、それ以降の値を下流へ送り、最初の一致より前の値を捨てます。一致後は predicate を呼び出さず、一致する値がなければ空になります。predicate は値だけを受け取ります。
 
 終端処理は `toArray()`、`toCollection()`、`fold()`、`getIterator()` です。`foreach` でも最終出力を list key で順に取得できます。`getIterator()` は返した iterator を進める前でも、呼び出した時点で `Sequence` を使用済みにします。`fold($initial, $step)` は `step($state, $value)` を順に適用します。
 

@@ -106,12 +106,11 @@ final class Sequence implements IteratorAggregate
     }
 
     /**
-     * Lazily retains values for which the predicate returns an actual bool true.
+     * Lazily retains values for which the predicate result is truthy.
      *
      * @param callable(T): bool $predicate
      * @return $this
      * @throws SequenceConsumedException If this sequence was already consumed.
-     * @throws TypeError If the predicate returns a non-boolean value.
      */
     public function filter(callable $predicate): self
     {
@@ -123,12 +122,11 @@ final class Sequence implements IteratorAggregate
 
     /**
      * Lazily includes values through the first value for which the predicate
-     * returns an actual bool true, then stops reading the source.
+     * result is truthy, then stops reading the source.
      *
      * @param callable(T): bool $predicate
      * @return $this
      * @throws SequenceConsumedException If this sequence was already consumed.
-     * @throws TypeError If the predicate returns a non-boolean value.
      */
     public function until(callable $predicate): self
     {
@@ -139,14 +137,13 @@ final class Sequence implements IteratorAggregate
     }
 
     /**
-     * Lazily skips values before the first value for which the predicate
-     * returns an actual bool true, then forwards that value and all following
-     * values without calling the predicate again.
+     * Lazily skips values before the first value for which the predicate result
+     * is truthy, then forwards that value and all following values without
+     * calling the predicate again.
      *
      * @param callable(T): bool $predicate
      * @return $this
      * @throws SequenceConsumedException If this sequence was already consumed.
-     * @throws TypeError If the predicate returns a non-boolean value.
      */
     public function skipUntil(callable $predicate): self
     {

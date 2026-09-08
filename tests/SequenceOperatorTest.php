@@ -229,38 +229,23 @@ final class SequenceOperatorTest extends TestCase
         self::assertSame([1, 2], $separateCalls);
     }
 
-    public function testSkipUntilRejectsNonBooleanResultsAndConsumesTheSequence(): void
+    public function testSkipUntilUsesPhpTruthinessForPredicateResults(): void
     {
-        $sequence = Sequence::of(1);
-        $skipUntil = new ReflectionMethod($sequence, 'skipUntil');
-        $skipUntil->invoke($sequence, static fn(mixed $value): int => is_int($value) ? $value : 0);
+        $object = new \stdClass();
+        $sequence = Sequence::of(0, '', null, $object, 'later');
+        // @phpstan-ignore argument.type (Non-boolean results intentionally exercise runtime truthiness.)
+        $sequence->skipUntil(static fn(mixed $value): mixed => $value);
 
-        try {
-            $sequence->toArray();
-            self::fail('A non-boolean predicate result was accepted.');
-        } catch (\Throwable $exception) {
-            self::assertInstanceOf(TypeError::class, $exception);
-        }
-
-        $this->expectException(SequenceConsumedException::class);
-        $sequence->map(static fn(mixed $value): mixed => $value);
+        self::assertSame([$object, 'later'], $sequence->toArray());
     }
 
-    public function testUntilRejectsNonBooleanResultsAndConsumesTheSequence(): void
+    public function testUntilUsesPhpTruthinessForPredicateResults(): void
     {
-        $sequence = Sequence::from([1]);
-        $until = new ReflectionMethod($sequence, 'until');
-        $until->invoke($sequence, static fn(mixed $value): int => is_int($value) ? $value : 0);
+        $sequence = Sequence::from([0, '', 2, 3]);
+        // @phpstan-ignore argument.type (Non-boolean results intentionally exercise runtime truthiness.)
+        $sequence->until(static fn(mixed $value): mixed => $value);
 
-        try {
-            $sequence->toArray();
-            self::fail('A non-boolean predicate result was accepted.');
-        } catch (\Throwable $exception) {
-            self::assertInstanceOf(TypeError::class, $exception);
-        }
-
-        $this->expectException(SequenceConsumedException::class);
-        $sequence->map(static fn(mixed $value): mixed => $value);
+        self::assertSame([0, '', 2], $sequence->toArray());
     }
 
     public function testUntilRunsAfterMapAndFilterInDeclarationOrder(): void
@@ -299,21 +284,14 @@ final class SequenceOperatorTest extends TestCase
         self::assertSame([1, 1, 1], $argumentCounts);
     }
 
-    public function testFilterRejectsANonBooleanResultAndConsumesTheSequence(): void
+    public function testFilterUsesPhpTruthinessForPredicateResults(): void
     {
-        $sequence = Sequence::of(1);
-        $filter = new ReflectionMethod($sequence, 'filter');
-        $filter->invoke($sequence, static fn(mixed $value): int => is_int($value) ? $value : 0);
+        $object = new \stdClass();
+        $sequence = Sequence::of(1, 0, 'value', '', null, $object);
+        // @phpstan-ignore argument.type (Non-boolean results intentionally exercise runtime truthiness.)
+        $sequence->filter(static fn(mixed $value): mixed => $value);
 
-        try {
-            iterator_to_array($sequence);
-            self::fail('A non-boolean predicate result was accepted.');
-        } catch (TypeError $exception) {
-            self::assertInstanceOf(TypeError::class, $exception);
-        }
-
-        $this->expectException(SequenceConsumedException::class);
-        $sequence->map(static fn(mixed $value): mixed => $value);
+        self::assertSame([1, 'value', $object], $sequence->toArray());
     }
 
     public function testFlatMapRejectsANonIterableResultAndConsumesTheSequence(): void

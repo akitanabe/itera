@@ -19,27 +19,17 @@ final class SequenceOperation
     /** @return Closure(mixed, int): SequenceStep */
     public static function filter(callable $predicate): Closure
     {
-        return static function (mixed $value, int $_position) use ($predicate): SequenceStep {
-            $accepted = $predicate($value);
-            if (!is_bool($accepted)) {
-                throw new TypeError('Sequence filter predicate must return bool.');
-            }
-
-            return $accepted ? SequenceStep::forward($value) : SequenceStep::skip();
-        };
+        return static fn(mixed $value, int $_position): SequenceStep => $predicate($value)
+            ? SequenceStep::forward($value)
+            : SequenceStep::skip();
     }
 
     /** @return Closure(mixed, int): SequenceStep */
     public static function until(callable $predicate): Closure
     {
-        return static function (mixed $value, int $_position) use ($predicate): SequenceStep {
-            $matches = $predicate($value);
-            if (!is_bool($matches)) {
-                throw new TypeError('Sequence until predicate must return bool.');
-            }
-
-            return $matches ? SequenceStep::stopUpstream($value) : SequenceStep::forward($value);
-        };
+        return static fn(mixed $value, int $_position): SequenceStep => $predicate($value)
+            ? SequenceStep::stopUpstream($value)
+            : SequenceStep::forward($value);
     }
 
     /** @return Closure(mixed, int): SequenceStep */
@@ -52,12 +42,7 @@ final class SequenceOperation
                 return SequenceStep::forward($value);
             }
 
-            $matches = $predicate($value);
-            if (!is_bool($matches)) {
-                throw new TypeError('Sequence skipUntil predicate must return bool.');
-            }
-
-            if (!$matches) {
+            if (!$predicate($value)) {
                 return SequenceStep::skip();
             }
 
