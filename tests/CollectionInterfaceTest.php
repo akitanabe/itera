@@ -28,9 +28,9 @@ final class CollectionInterfaceTest extends TestCase
         });
 
         self::assertSame([], $seen);
-        self::assertSame([10, 20], $sequence->toArray());
+        self::assertSame([10, 20], $sequence->collect()->values());
         self::assertSame([1, 2], $seen);
         self::assertSame([1, 2], $collection->values());
-        self::assertSame([1, 2], $collection->sequence()->toArray());
+        self::assertSame([1, 2], $collection->sequence()->collect()->values());
     }
 }

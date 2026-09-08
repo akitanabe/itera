@@ -214,30 +214,13 @@ final class Sequence implements IteratorAggregate
     }
 
     /**
-     * Consumes every output value and returns it with consecutive list keys.
-     * This operation finishes only when the resulting sequence is finite.
-     *
-     * @return list<T>
-     * @throws SequenceConsumedException If this sequence was already consumed.
-     */
-    public function toArray(): array
-    {
-        $values = [];
-        foreach ($this->beginConsumption() as $value) {
-            $values[] = $value;
-        }
-
-        return $values;
-    }
-
-    /**
      * Consumes every output value into a fresh Collection, including for an
      * empty result. This operation finishes only when the result is finite.
      *
      * @return Collection<T>
      * @throws SequenceConsumedException If this sequence was already consumed.
      */
-    public function toCollection(): Collection
+    public function collect(): Collection
     {
         $values = [];
         foreach ($this->beginConsumption() as $value) {

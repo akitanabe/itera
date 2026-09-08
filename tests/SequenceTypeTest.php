@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Itera\Tests;
 
+use Itera\Collection;
 use Itera\Sequence;
 use PHPStan\Testing\TypeInferenceTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -51,7 +52,7 @@ final class SequenceTypeTest extends TypeInferenceTestCase
             assertType('Itera\\Sequence<int>', $sequence);
         }
 
-        self::assertSame([1, 2], $sequence->toArray());
+        self::assertSame([1, 2], $sequence->collect()->values());
     }
 
     public function testUntilPreservesTheElementTypeAfterMap(): void
@@ -64,7 +65,7 @@ final class SequenceTypeTest extends TypeInferenceTestCase
             assertType('Itera\\Sequence<decimal-int-string>', $sequence);
         }
 
-        self::assertSame(['1', '2'], $sequence->toArray());
+        self::assertSame(['1', '2'], $sequence->collect()->values());
     }
 
     public function testUntilPreservesTheElementTypeAfterFlatMap(): void
@@ -77,7 +78,7 @@ final class SequenceTypeTest extends TypeInferenceTestCase
             assertType('Itera\\Sequence<float>', $sequence);
         }
 
-        self::assertSame([1.0, 2.0], $sequence->toArray());
+        self::assertSame([1.0, 2.0], $sequence->collect()->values());
     }
 
     public function testSkipUntilPreservesTheElementType(): void
@@ -88,7 +89,7 @@ final class SequenceTypeTest extends TypeInferenceTestCase
             assertType('Itera\\Sequence<int>', $sequence);
         }
 
-        self::assertSame([2], $sequence->toArray());
+        self::assertSame([2], $sequence->collect()->values());
     }
 
     public function testSkipUntilPreservesTheElementTypeAfterMap(): void
@@ -101,7 +102,7 @@ final class SequenceTypeTest extends TypeInferenceTestCase
             assertType('Itera\\Sequence<decimal-int-string>', $sequence);
         }
 
-        self::assertSame(['2'], $sequence->toArray());
+        self::assertSame(['2'], $sequence->collect()->values());
     }
 
     public function testSkipUntilPreservesTheElementTypeAfterFlatMap(): void
@@ -114,21 +115,22 @@ final class SequenceTypeTest extends TypeInferenceTestCase
             assertType('Itera\\Sequence<float>', $sequence);
         }
 
-        self::assertSame([2.0], $sequence->toArray());
+        self::assertSame([2.0], $sequence->collect()->values());
     }
 
     public function testTerminalResultTypesRemainVisibleToStaticAnalysis(): void
     {
         $sequence = Sequence::from([1, 2]);
-        $array = $sequence->toArray();
+        $collection = $sequence->collect();
         $sum = Sequence::from([1, 2])->fold(0.0, static fn(float $state, int $value): float => $state + $value);
 
         if (function_exists('PHPStan\\Testing\\assertType')) {
-            assertType('list<int>', $array);
+            assertType('Itera\\Collection<int>', $collection);
             assertType('float', $sum);
         }
 
-        self::assertSame([1, 2], $array);
+        self::assertInstanceOf(Collection::class, $collection);
+        self::assertSame([1, 2], $collection->values());
         self::assertSame(3.0, $sum);
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Itera\Tests;
 
+use Itera\Collection;
 use Itera\Sequence;
 use Itera\SequenceConsumedException;
 use PHPUnit\Framework\Attributes\TestWith;
@@ -11,7 +12,20 @@ use PHPUnit\Framework\TestCase;
 
 final class SequenceTerminalTest extends TestCase
 {
-    public function testToArrayReturnsAListAndConsumesEveryFiniteValue(): void
+    public function testCollectIsTheOnlyMaterializationMethodAndReturnsACollection(): void
+    {
+        self::assertContains('collect', get_class_methods(Sequence::class));
+        self::assertNotContains('toArray', get_class_methods(Sequence::class));
+        self::assertNotContains('toCollection', get_class_methods(Sequence::class));
+
+        $materialized = Sequence::from(['named' => 'alpha', 8 => 'beta'])->collect();
+
+        self::assertInstanceOf(Collection::class, $materialized);
+        self::assertSame(['alpha', 'beta'], $materialized->values());
+        self::assertSame([], Sequence::empty()->collect()->values());
+    }
+
+    public function testCollectReturnsACollectionAndConsumesEveryFiniteValue(): void
     {
         $seen = [];
         $source = static function () use (&$seen): iterable {
@@ -21,7 +35,7 @@ final class SequenceTerminalTest extends TestCase
             }
         };
 
-        self::assertSame(['alpha', 'beta'], Sequence::from($source())->toArray());
+        self::assertSame(['alpha', 'beta'], Sequence::from($source())->collect()->values());
         self::assertSame(['first', 8], $seen);
     }
 
@@ -77,7 +91,7 @@ final class SequenceTerminalTest extends TestCase
         $sequence = Sequence::from($source());
 
         try {
-            $sequence->toArray();
+            $sequence->collect();
             self::fail('The source exception was not thrown.');
         } catch (\RuntimeException $actual) {
             self::assertSame($expected, $actual);

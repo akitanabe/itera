@@ -30,7 +30,8 @@ final class SequenceStreamingTest extends TestCase
         $values = Sequence::from($source)
             ->take(1)
             ->flatMap(static fn(): iterable => $inner)
-            ->toArray();
+            ->collect()
+            ->values();
 
         self::assertSame([1, 11], $values);
         self::assertSame(
@@ -58,7 +59,8 @@ final class SequenceStreamingTest extends TestCase
             [1, 2],
             Sequence::from($source)
                 ->until(static fn(mixed $value): bool => $value === 2)
-                ->toArray(),
+                ->collect()
+                ->values(),
         );
         self::assertSame(
             ['source:valid:0', 'source:current:0', 'source:next:0', 'source:valid:1', 'source:current:1'],
@@ -81,7 +83,8 @@ final class SequenceStreamingTest extends TestCase
                     return $value === 2;
                 })
                 ->take(1)
-                ->toArray(),
+                ->collect()
+                ->values(),
         );
         self::assertSame([1, 2], $seen);
         self::assertSame(
@@ -103,7 +106,8 @@ final class SequenceStreamingTest extends TestCase
 
                     return $value === 11;
                 })
-                ->toArray(),
+                ->collect()
+                ->values(),
         );
         self::assertSame([1, 11], $seen);
     }
@@ -118,7 +122,8 @@ final class SequenceStreamingTest extends TestCase
             Sequence::from($source)
                 ->until(static fn(mixed $value): bool => $value === 2)
                 ->flatMap(static fn(mixed $value): iterable => $value === 1 ? [$value, 11] : [$value, 12])
-                ->toArray(),
+                ->collect()
+                ->values(),
         );
         self::assertSame(
             ['source:valid:0', 'source:current:0', 'source:next:0', 'source:valid:1', 'source:current:1'],
@@ -141,7 +146,8 @@ final class SequenceStreamingTest extends TestCase
                     return new SequenceRecordingIterator($values, $events, $name);
                 })
                 ->until(static fn(mixed $value): bool => $value === 2)
-                ->toArray(),
+                ->collect()
+                ->values(),
         );
         self::assertSame(
             [
@@ -174,7 +180,7 @@ final class SequenceStreamingTest extends TestCase
             $source = new SequenceRecordingIterator([1, 2, 3], $events, 'source');
             $sequence = Sequence::from($source)->until(static fn(mixed $value): bool => $value === 2);
 
-            self::assertSame([], $operation($sequence)->toArray());
+            self::assertSame([], $operation($sequence)->collect()->values());
             self::assertSame(
                 ['source:valid:0', 'source:current:0', 'source:next:0', 'source:valid:1', 'source:current:1'],
                 $events,
@@ -201,7 +207,8 @@ final class SequenceStreamingTest extends TestCase
 
                     return false;
                 })
-                ->toArray(),
+                ->collect()
+                ->values(),
         );
         self::assertSame([1, 'until:1'], $seen);
 
@@ -216,7 +223,8 @@ final class SequenceStreamingTest extends TestCase
 
                     return true;
                 })
-                ->toArray(),
+                ->collect()
+                ->values(),
         );
         self::assertSame([], $events);
         self::assertSame(0, $untilCalls);
@@ -241,7 +249,8 @@ final class SequenceStreamingTest extends TestCase
 
                     return false;
                 })
-                ->toArray(),
+                ->collect()
+                ->values(),
         );
         self::assertSame([1, 'skipUntil:1'], $seen);
 
@@ -256,7 +265,8 @@ final class SequenceStreamingTest extends TestCase
 
                     return true;
                 })
-                ->toArray(),
+                ->collect()
+                ->values(),
         );
         self::assertSame([], $events);
         self::assertSame(0, $skipUntilCalls);
@@ -271,7 +281,8 @@ final class SequenceStreamingTest extends TestCase
         $values = Sequence::from($source)
             ->flatMap(static fn(): iterable => $inner)
             ->take(1)
-            ->toArray();
+            ->collect()
+            ->values();
 
         self::assertSame([1], $values);
         self::assertSame(['outer:valid:0', 'outer:current:0', 'inner:valid:0', 'inner:current:0'], $events);
@@ -285,7 +296,8 @@ final class SequenceStreamingTest extends TestCase
                 ->flatMap(static fn(int $value): iterable => [$value, $value + 10])
                 ->drop(2)
                 ->take(1)
-                ->toArray(),
+                ->collect()
+                ->values(),
         );
 
         $events = [];
@@ -295,7 +307,8 @@ final class SequenceStreamingTest extends TestCase
             ->flatMap(static fn(int $value): iterable => $value === 2 ? $lastInner : [$value, -$value])
             ->drop(3)
             ->take(2)
-            ->toArray();
+            ->collect()
+            ->values();
 
         self::assertSame([-11, 2], $values);
         self::assertSame(['last:valid:0', 'last:current:0'], $events);
@@ -311,7 +324,8 @@ final class SequenceStreamingTest extends TestCase
 
                 return $value * 10;
             })
-            ->toArray();
+            ->collect()
+            ->values();
 
         self::assertSame([20], $values);
         self::assertSame([2], $mapped);
@@ -328,7 +342,7 @@ final class SequenceStreamingTest extends TestCase
             $sequence = Sequence::from(new SequenceRecordingIterator([1, 2], $events, 'outer'))->take(1);
             $operation($sequence);
 
-            self::assertSame([], $sequence->toArray());
+            self::assertSame([], $sequence->collect()->values());
             self::assertSame(['outer:valid:0', 'outer:current:0'], $events);
         }
     }
@@ -344,7 +358,8 @@ final class SequenceStreamingTest extends TestCase
                 ->take($firstLimit)
                 ->flatMap(static fn(): iterable => $inner)
                 ->take($secondLimit)
-                ->toArray();
+                ->collect()
+                ->values();
 
             self::assertSame([1], $values);
             self::assertSame(['outer:valid:0', 'outer:current:0', 'inner:valid:0', 'inner:current:0'], $events);
@@ -471,7 +486,7 @@ final class SequenceStreamingTest extends TestCase
                 $sequence->take(0);
             }
 
-            self::assertSame([], $sequence->toArray());
+            self::assertSame([], $sequence->collect()->values());
             self::assertSame(1, $source->calls);
             self::assertSame([], $events);
             self::assertSame(0, $calls);
@@ -480,9 +495,11 @@ final class SequenceStreamingTest extends TestCase
 
     public function testPipelinePreservesNullFalseAndIterableValues(): void
     {
-        $values = Sequence::of(null, false, [1])->map(
-            static fn(mixed $value): mixed => $value,
-        )->flatMap(static fn(mixed $value): iterable => [$value])->toArray();
+        $values = Sequence::of(null, false, [1])
+            ->map(static fn(mixed $value): mixed => $value)
+            ->flatMap(static fn(mixed $value): iterable => [$value])
+            ->collect()
+            ->values();
 
         self::assertSame([0 => null, 1 => false, 2 => [1]], $values);
     }
@@ -646,7 +663,10 @@ final class SequenceStreamingTest extends TestCase
             return $values;
         };
 
-        self::assertSame(['first', 'second'], Sequence::from([$unstarted, $exhausted])->flatMap($identity)->toArray());
+        self::assertSame(
+            ['first', 'second'],
+            Sequence::from([$unstarted, $exhausted])->flatMap($identity)->collect()->values(),
+        );
     }
 
     public function testFlatMapInputFailuresKeepTheirIdentityAndConsumeTheSequence(): void
@@ -713,7 +733,7 @@ final class SequenceStreamingTest extends TestCase
             $sequence = Sequence::of('outer')->flatMap(static fn(): iterable => $inner);
 
             try {
-                $sequence->toArray();
+                $sequence->collect();
                 self::fail($failurePoint . ' exception was not thrown.');
             } catch (\RuntimeException $actual) {
                 self::assertSame($expected, $actual);

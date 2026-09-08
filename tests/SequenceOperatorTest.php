@@ -60,24 +60,40 @@ final class SequenceOperatorTest extends TestCase
 
     public function testUntilIncludesTheFirstMatchingValueAndHandlesBoundaries(): void
     {
-        self::assertSame([1], Sequence::from([1, 2, 3])->until(static fn(int $value): bool => $value === 1)->toArray());
+        self::assertSame(
+            [1],
+            Sequence::from([1, 2, 3])
+                ->until(static fn(int $value): bool => $value === 1)
+                ->collect()
+                ->values(),
+        );
         self::assertSame(
             [1, 2, 3],
-            Sequence::from([1, 2, 3])->until(static fn(int $value): bool => $value === 3)->toArray(),
+            Sequence::from([1, 2, 3])
+                ->until(static fn(int $value): bool => $value === 3)
+                ->collect()
+                ->values(),
         );
         self::assertSame(
             [1, 2],
-            Sequence::from([1, 2, 3])->until(static fn(int $value): bool => $value === 2)->toArray(),
+            Sequence::from([1, 2, 3])
+                ->until(static fn(int $value): bool => $value === 2)
+                ->collect()
+                ->values(),
         );
         self::assertSame(
             [1, 2, 3],
-            Sequence::from([1, 2, 3])->until(static fn(int $value): bool => $value === 9)->toArray(),
+            Sequence::from([1, 2, 3])
+                ->until(static fn(int $value): bool => $value === 9)
+                ->collect()
+                ->values(),
         );
         self::assertSame(
             [],
             Sequence::empty()
                 ->until(static fn(mixed $value): bool => true)
-                ->toArray(),
+                ->collect()
+                ->values(),
         );
     }
 
@@ -110,7 +126,10 @@ final class SequenceOperatorTest extends TestCase
     {
         self::assertSame(
             [null, false],
-            Sequence::of(null, false, 'later')->until(static fn(mixed $value): bool => $value === false)->toArray(),
+            Sequence::of(null, false, 'later')
+                ->until(static fn(mixed $value): bool => $value === false)
+                ->collect()
+                ->values(),
         );
     }
 
@@ -118,31 +137,44 @@ final class SequenceOperatorTest extends TestCase
     {
         self::assertSame(
             [1, 2, 3],
-            Sequence::from([1, 2, 3])->skipUntil(static fn(int $value): bool => $value === 1)->toArray(),
+            Sequence::from([1, 2, 3])
+                ->skipUntil(static fn(int $value): bool => $value === 1)
+                ->collect()
+                ->values(),
         );
         self::assertSame(
             [3],
-            Sequence::from([1, 2, 3])->skipUntil(static fn(int $value): bool => $value === 3)->toArray(),
+            Sequence::from([1, 2, 3])
+                ->skipUntil(static fn(int $value): bool => $value === 3)
+                ->collect()
+                ->values(),
         );
         self::assertSame(
             [2, 3],
-            Sequence::from([1, 2, 3])->skipUntil(static fn(int $value): bool => $value === 2)->toArray(),
+            Sequence::from([1, 2, 3])
+                ->skipUntil(static fn(int $value): bool => $value === 2)
+                ->collect()
+                ->values(),
         );
         $noMatchCalls = [];
         self::assertSame(
             [],
-            Sequence::from([1, 2, 3])->skipUntil(static function (int $value) use (&$noMatchCalls): bool {
-                $noMatchCalls[] = $value;
+            Sequence::from([1, 2, 3])
+                ->skipUntil(static function (int $value) use (&$noMatchCalls): bool {
+                    $noMatchCalls[] = $value;
 
-                return false;
-            })->toArray(),
+                    return false;
+                })
+                ->collect()
+                ->values(),
         );
         self::assertSame([1, 2, 3], $noMatchCalls);
         self::assertSame(
             [],
             Sequence::empty()
                 ->skipUntil(static fn(mixed $value): bool => true)
-                ->toArray(),
+                ->collect()
+                ->values(),
         );
     }
 
@@ -177,9 +209,10 @@ final class SequenceOperatorTest extends TestCase
     {
         self::assertSame(
             [null, false, 'later'],
-            Sequence::from(['null' => null, 'false' => false, 'later' => 'later'])->skipUntil(
-                static fn(mixed $value): bool => $value === null,
-            )->toArray(),
+            Sequence::from(['null' => null, 'false' => false, 'later' => 'later'])
+                ->skipUntil(static fn(mixed $value): bool => $value === null)
+                ->collect()
+                ->values(),
         );
     }
 
@@ -194,7 +227,8 @@ final class SequenceOperatorTest extends TestCase
 
                 return $value === 20;
             })
-            ->toArray();
+            ->collect()
+            ->values();
 
         self::assertSame([20, 30], $values);
         self::assertSame([20], $seen);
@@ -220,11 +254,11 @@ final class SequenceOperatorTest extends TestCase
             return $value === 2;
         });
 
-        self::assertSame([3, 4], $sequence->toArray());
+        self::assertSame([3, 4], $sequence->collect()->values());
         self::assertSame([1, 2], $firstCalls);
         self::assertSame([2, 3], $secondCalls);
 
-        self::assertSame([2, 3], $separate->toArray());
+        self::assertSame([2, 3], $separate->collect()->values());
         self::assertSame([1, 2], $separateCalls);
     }
 
@@ -235,7 +269,7 @@ final class SequenceOperatorTest extends TestCase
         // @phpstan-ignore argument.type (Non-boolean results intentionally exercise runtime truthiness.)
         $sequence->skipUntil(static fn(mixed $value): mixed => $value);
 
-        self::assertSame([$object, 'later'], $sequence->toArray());
+        self::assertSame([$object, 'later'], $sequence->collect()->values());
     }
 
     public function testUntilUsesPhpTruthinessForPredicateResults(): void
@@ -244,7 +278,7 @@ final class SequenceOperatorTest extends TestCase
         // @phpstan-ignore argument.type (Non-boolean results intentionally exercise runtime truthiness.)
         $sequence->until(static fn(mixed $value): mixed => $value);
 
-        self::assertSame([0, '', 2], $sequence->toArray());
+        self::assertSame([0, '', 2], $sequence->collect()->values());
     }
 
     public function testUntilRunsAfterMapAndFilterInDeclarationOrder(): void
@@ -258,7 +292,8 @@ final class SequenceOperatorTest extends TestCase
 
                 return $value === 20;
             })
-            ->toArray();
+            ->collect()
+            ->values();
 
         self::assertSame([20], $values);
         self::assertSame([20], $seen);
@@ -290,7 +325,7 @@ final class SequenceOperatorTest extends TestCase
         // @phpstan-ignore argument.type (Non-boolean results intentionally exercise runtime truthiness.)
         $sequence->filter(static fn(mixed $value): mixed => $value);
 
-        self::assertSame([1, 'value', $object], $sequence->toArray());
+        self::assertSame([1, 'value', $object], $sequence->collect()->values());
     }
 
     public function testFlatMapRejectsANonIterableResultAndConsumesTheSequence(): void
@@ -367,7 +402,7 @@ final class SequenceOperatorTest extends TestCase
                 $this->addToAssertionCount(1);
             }
         }
-        self::assertSame([], $sequence->toArray());
+        self::assertSame([], $sequence->collect()->values());
 
         $sequence = Sequence::of(1)->take(0);
         $sequence->getIterator();

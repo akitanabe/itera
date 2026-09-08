@@ -14,12 +14,12 @@ use ReflectionMethod;
 
 final class SequenceContractTest extends TestCase
 {
-    public function testToCollectionAlwaysCreatesANewCollection(): void
+    public function testCollectAlwaysCreatesANewCollection(): void
     {
         $original = Collection::of('first', 'second');
-        $materialized = Sequence::from($original)->toCollection();
+        $materialized = Sequence::from($original)->collect();
         $emptyOriginal = Collection::empty();
-        $emptyMaterialized = Sequence::from($emptyOriginal)->toCollection();
+        $emptyMaterialized = Sequence::from($emptyOriginal)->collect();
 
         self::assertNotSame($original, $materialized);
         self::assertSame($original->values(), $materialized->values());
@@ -31,8 +31,8 @@ final class SequenceContractTest extends TestCase
     {
         $collection = Collection::from(['named' => 'alpha', 8 => 'beta']);
 
-        self::assertSame(['alpha', 'beta'], Sequence::from($collection)->toArray());
-        self::assertSame(['alpha', 'beta'], $collection->sequence()->toArray());
+        self::assertSame(['alpha', 'beta'], Sequence::from($collection)->collect()->values());
+        self::assertSame(['alpha', 'beta'], $collection->sequence()->collect()->values());
     }
 
     #[DataProvider('instanceOperations')]
@@ -53,14 +53,14 @@ final class SequenceContractTest extends TestCase
         $sequence = Sequence::of('value');
 
         try {
-            $operation($sequence, $expected)->toArray();
+            $operation($sequence, $expected)->collect();
             self::fail('The callback exception was not thrown.');
         } catch (\RuntimeException $actual) {
             self::assertSame($expected, $actual);
         }
 
         $this->expectException(SequenceConsumedException::class);
-        $sequence->toArray();
+        $sequence->collect();
     }
 
     public function testCallbackIsReleasedAfterConsumptionCompletes(): void
@@ -70,7 +70,7 @@ final class SequenceContractTest extends TestCase
         $sequence = Sequence::from([1])->map($mapper);
         unset($mapper);
 
-        self::assertSame([1], $sequence->toArray());
+        self::assertSame([1], $sequence->collect()->values());
 
         self::assertNull($mapperReference->get());
     }
@@ -109,8 +109,7 @@ final class SequenceContractTest extends TestCase
         ];
         yield 'take' => [static fn(Sequence $sequence): mixed => $sequence->take(1)];
         yield 'drop' => [static fn(Sequence $sequence): mixed => $sequence->drop(1)];
-        yield 'toArray' => [static fn(Sequence $sequence): mixed => $sequence->toArray()];
-        yield 'toCollection' => [static fn(Sequence $sequence): mixed => $sequence->toCollection()];
+        yield 'collect' => [static fn(Sequence $sequence): mixed => $sequence->collect()];
         yield 'fold' => [
             static fn(Sequence $sequence): mixed => $sequence->fold(
                 null,
