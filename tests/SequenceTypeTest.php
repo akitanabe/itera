@@ -5,13 +5,20 @@ declare(strict_types=1);
 namespace Itera\Tests;
 
 use Itera\Sequence;
+use PHPStan\Testing\TypeInferenceTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 
 use function PHPStan\Testing\assertType;
 
-final class SequenceTypeTest extends TestCase
+final class SequenceTypeTest extends TypeInferenceTestCase
 {
+    public function testInferredTypesMatchTheDeclaredExpectations(): void
+    {
+        foreach (self::gatherAssertTypes(__FILE__) as $assertion) {
+            $this->assertFileAsserts(...$assertion);
+        }
+    }
+
     #[DataProvider('flags')]
     public function testMutableTypeChangesRemainVisibleToStaticAnalysis(bool $flag): void
     {
