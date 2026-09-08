@@ -148,22 +148,6 @@ final class Collection implements IteratorAggregate, Countable
     }
 
     /**
-     * @return self<T>
-     */
-    public function reverse(): self
-    {
-        return new self(array_reverse($this->values));
-    }
-
-    /**
-     * @return self<T>
-     */
-    public function slice(int $offset, ?int $length = null): self
-    {
-        return new self(array_slice($this->values, $offset, $length));
-    }
-
-    /**
      * @return list<T>
      */
     public function values(): array

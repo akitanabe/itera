@@ -12,7 +12,7 @@ PHP で値・対応関係・遅延計算を分離して扱うための、軽量�
 
 ### Collection
 
-`Collection<T>` は再利用可能な、順序付きの materialized value collection です。`contains()`、`find()`、`indexOf()`、`findIndex()`、`any()`、`all()` による query と、`reverse()`、`slice()` による保持済み順序への操作を提供します。値の変換や遅延処理は `sequence()` から `Sequence<T>` に移します。
+`Collection<T>` は再利用可能な、順序付きの materialized value collection です。`contains()`、`find()`、`indexOf()`、`findIndex()`、`any()`、`all()` による query を提供します。値の変換や遅延処理は `sequence()` から `Sequence<T>` に移します。
 
 ```php
 $users = Collection::of($user1, $user2, $user3);
