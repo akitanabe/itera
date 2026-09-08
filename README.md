@@ -57,6 +57,27 @@ $result = Sequence::from($users)
 
 `collect()`、`fold()` は結果を最後まで消費するため、無限 source では終了しません。`until()` も一致する値がない無限 source では終了せず、`skipUntil()` も一致後に無限の残りがある場合は残りを全消費する終端処理では終了しません。必要に応じて先に `take()` で有限化します。
 
+### Pipe facade
+
+PHP 8.5 の pipe operator では、`Itera\Pipe` の factory を使って `Sequence` と同じ pipeline API を関数として組み立てられます。関数は Composer の通常の production autoload で読み込まれます。
+
+```php
+use function Itera\Pipe\{collect, filter, map, sequence, take};
+
+$names = $users
+    |> sequence()
+    |> filter(fn (User $user): bool => $user->isActive())
+    |> map(fn (User $user): string => $user->profile()->name())
+    |> take(10)
+    |> collect();
+```
+
+`sequence()`、`map($mapper)`、`filter($predicate)`、`flatMap($mapper)`、`until($predicate)`、`skipUntil($predicate)`、`take($count)`、`drop($count)`、`collect()`、`fold($initial, $step)`、`getIterator()` は、それぞれ単一の入力を受け取る `Closure` を返します。factory の作成時には source や callback を実行せず、`take()` と `drop()` の負数検証も行いません。返した Closure を `Sequence` に適用した時点で対応するメソッドを直接呼ぶため、負数の拒否や消費済み入力の拒否はその適用時に発生します。
+
+中間操作は同じ mutable な `Sequence` を返し、source と callback の実行は終端処理まで遅延されます。`collect()` と `fold()` は適用時に消費し、`getIterator()` も適用した時点で Sequence を使用済みにします。各 Sequence は一度だけ消費できます。`collect()` と `fold()`、および iterator を最後まで読む処理には有限な出力が必要です。
+
+factory が返した Closure は複数の Sequence に適用できます。`take()` や `drop()` の進行状態が Sequence 間で共有されることはありません。一方、factory に渡した callback、その callback が捕捉した値、`fold()` の初期オブジェクトは複製されず、同じ値が再利用されます。
+
 ### 採用範囲
 
 現在の公開モデルは `Collection`、`Map`、`Sequence` です。`Fold<Input, State, Output>` による集約の合成は必要性が確認できた段階で導入します。

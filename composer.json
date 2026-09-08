@@ -14,7 +14,10 @@
   "autoload": {
     "psr-4": {
       "Itera\\": "src/"
-    }
+    },
+    "files": [
+      "src/Pipe/functions.php"
+    ]
   },
   "autoload-dev": {
     "psr-4": {
