@@ -115,6 +115,137 @@ final class SequenceOperatorTest extends TestCase
         );
     }
 
+    public function testSkipUntilRetainsTheFirstMatchAndAllFollowingValues(): void
+    {
+        self::assertSame(
+            [1, 2, 3],
+            Sequence::from([1, 2, 3])->skipUntil(static fn(int $value): bool => $value === 1)->toArray(),
+        );
+        self::assertSame(
+            [3],
+            Sequence::from([1, 2, 3])->skipUntil(static fn(int $value): bool => $value === 3)->toArray(),
+        );
+        self::assertSame(
+            [2, 3],
+            Sequence::from([1, 2, 3])->skipUntil(static fn(int $value): bool => $value === 2)->toArray(),
+        );
+        $noMatchCalls = [];
+        self::assertSame(
+            [],
+            Sequence::from([1, 2, 3])->skipUntil(static function (int $value) use (&$noMatchCalls): bool {
+                $noMatchCalls[] = $value;
+
+                return false;
+            })->toArray(),
+        );
+        self::assertSame([1, 2, 3], $noMatchCalls);
+        self::assertSame(
+            [],
+            Sequence::empty()
+                ->skipUntil(static fn(mixed $value): bool => true)
+                ->toArray(),
+        );
+    }
+
+    public function testSkipUntilIsLazyMutableAndReceivesOnlyValuesUntilTheFirstMatch(): void
+    {
+        $calls = [];
+        $sequence = Sequence::from(
+            (static function () use (&$calls): iterable {
+                $calls[] = 'source';
+                yield 1;
+                $calls[] = 'after';
+                yield 2;
+                $calls[] = 'after-match';
+                yield 3;
+            })(),
+        );
+
+        self::assertSame($sequence, $sequence->skipUntil(static function (int $value) use (&$calls): bool {
+            $calls[] = ['skipUntil', $value, func_num_args()];
+
+            return $value === 2;
+        }));
+        self::assertSame([], $calls);
+
+        $iterator = $sequence->getIterator();
+        self::assertCount(0, $calls);
+        self::assertSame([2, 3], iterator_to_array($iterator));
+        self::assertSame(['source', ['skipUntil', 1, 1], 'after', ['skipUntil', 2, 1], 'after-match'], $calls);
+    }
+
+    public function testSkipUntilPreservesNullFalseValuesAndListKeys(): void
+    {
+        self::assertSame(
+            [null, false, 'later'],
+            Sequence::from(['null' => null, 'false' => false, 'later' => 'later'])->skipUntil(
+                static fn(mixed $value): bool => $value === null,
+            )->toArray(),
+        );
+    }
+
+    public function testSkipUntilRunsAfterMapAndFilterInDeclarationOrder(): void
+    {
+        $seen = [];
+        $values = Sequence::from([1, 2, 3])
+            ->map(static fn(int $value): int => $value * 10)
+            ->filter(static fn(int $value): bool => $value >= 20)
+            ->skipUntil(static function (int $value) use (&$seen): bool {
+                $seen[] = $value;
+
+                return $value === 20;
+            })
+            ->toArray();
+
+        self::assertSame([20, 30], $values);
+        self::assertSame([20], $seen);
+    }
+
+    public function testSkipUntilRegistrationsAndSequencesHaveIndependentState(): void
+    {
+        $firstCalls = [];
+        $secondCalls = [];
+        $separateCalls = [];
+        $sequence = Sequence::from([1, 2, 3, 4])->skipUntil(static function (int $value) use (&$firstCalls): bool {
+            $firstCalls[] = $value;
+
+            return $value === 2;
+        })->skipUntil(static function (int $value) use (&$secondCalls): bool {
+            $secondCalls[] = $value;
+
+            return $value === 3;
+        });
+        $separate = Sequence::from([1, 2, 3])->skipUntil(static function (int $value) use (&$separateCalls): bool {
+            $separateCalls[] = $value;
+
+            return $value === 2;
+        });
+
+        self::assertSame([3, 4], $sequence->toArray());
+        self::assertSame([1, 2], $firstCalls);
+        self::assertSame([2, 3], $secondCalls);
+
+        self::assertSame([2, 3], $separate->toArray());
+        self::assertSame([1, 2], $separateCalls);
+    }
+
+    public function testSkipUntilRejectsNonBooleanResultsAndConsumesTheSequence(): void
+    {
+        $sequence = Sequence::of(1);
+        $skipUntil = new ReflectionMethod($sequence, 'skipUntil');
+        $skipUntil->invoke($sequence, static fn(mixed $value): int => is_int($value) ? $value : 0);
+
+        try {
+            $sequence->toArray();
+            self::fail('A non-boolean predicate result was accepted.');
+        } catch (\Throwable $exception) {
+            self::assertInstanceOf(TypeError::class, $exception);
+        }
+
+        $this->expectException(SequenceConsumedException::class);
+        $sequence->map(static fn(mixed $value): mixed => $value);
+    }
+
     public function testUntilRejectsNonBooleanResultsAndConsumesTheSequence(): void
     {
         $sequence = Sequence::from([1]);

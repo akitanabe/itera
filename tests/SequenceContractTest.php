@@ -101,6 +101,9 @@ final class SequenceContractTest extends TestCase
         yield 'until' => [
             static fn(Sequence $sequence): mixed => $sequence->until(static fn(mixed $value): bool => true),
         ];
+        yield 'skipUntil' => [
+            static fn(Sequence $sequence): mixed => $sequence->skipUntil(static fn(mixed $value): bool => true),
+        ];
         yield 'flatMap' => [
             static fn(Sequence $sequence): mixed => $sequence->flatMap(static fn(mixed $value): iterable => [$value]),
         ];
@@ -141,6 +144,14 @@ final class SequenceContractTest extends TestCase
                 Sequence $sequence,
                 \RuntimeException $exception,
             ): Sequence => $sequence->until(static function () use ($exception): never {
+                throw $exception;
+            }),
+        ];
+        yield 'skipUntil' => [
+            static fn(
+                Sequence $sequence,
+                \RuntimeException $exception,
+            ): Sequence => $sequence->skipUntil(static function () use ($exception): never {
                 throw $exception;
             }),
         ];

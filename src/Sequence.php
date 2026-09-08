@@ -140,6 +140,24 @@ final class Sequence implements IteratorAggregate
     }
 
     /**
+     * Lazily skips values before the first value for which the predicate
+     * returns an actual bool true, then forwards that value and all following
+     * values without calling the predicate again.
+     *
+     * @param callable(T): bool $predicate
+     * @return $this
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     * @throws TypeError If the predicate returns a non-boolean value.
+     */
+    public function skipUntil(callable $predicate): self
+    {
+        $this->assertNotConsumed();
+        $this->operations[] = SequenceOperation::skipUntil($predicate);
+
+        return $this;
+    }
+
+    /**
      * Lazily replaces each value with the values of an iterable and returns
      * this same mutable sequence.
      *

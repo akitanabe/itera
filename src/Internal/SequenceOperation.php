@@ -43,6 +43,31 @@ final class SequenceOperation
     }
 
     /** @return Closure(mixed, int): SequenceStep */
+    public static function skipUntil(callable $predicate): Closure
+    {
+        $matched = false;
+
+        return static function (mixed $value, int $_position) use ($predicate, &$matched): SequenceStep {
+            if ($matched) {
+                return SequenceStep::forward($value);
+            }
+
+            $matches = $predicate($value);
+            if (!is_bool($matches)) {
+                throw new TypeError('Sequence skipUntil predicate must return bool.');
+            }
+
+            if (!$matches) {
+                return SequenceStep::skip();
+            }
+
+            $matched = true;
+
+            return SequenceStep::forward($value);
+        };
+    }
+
+    /** @return Closure(mixed, int): SequenceStep */
     public static function flatMap(callable $mapper): Closure
     {
         return static function (mixed $value, int $_position) use ($mapper): SequenceStep {

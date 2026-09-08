@@ -66,6 +66,48 @@ final class SequenceStreamingTest extends TestCase
         );
     }
 
+    public function testSkipUntilWithTakeStopsAtTheFirstMatchWithoutAdvancingTheSource(): void
+    {
+        $events = [];
+        $source = new SequenceRecordingIterator([1, 2, 3], $events, 'source');
+        $seen = [];
+
+        self::assertSame(
+            [2],
+            Sequence::from($source)
+                ->skipUntil(static function (mixed $value) use (&$seen): bool {
+                    $seen[] = $value;
+
+                    return $value === 2;
+                })
+                ->take(1)
+                ->toArray(),
+        );
+        self::assertSame([1, 2], $seen);
+        self::assertSame(
+            ['source:valid:0', 'source:current:0', 'source:next:0', 'source:valid:1', 'source:current:1'],
+            $events,
+        );
+    }
+
+    public function testSkipUntilStatePersistsAcrossFlatMappedChildren(): void
+    {
+        $seen = [];
+
+        self::assertSame(
+            [11, 2, 12],
+            Sequence::from([1, 2])
+                ->flatMap(static fn(int $value): iterable => [$value, $value + 10])
+                ->skipUntil(static function (int $value) use (&$seen): bool {
+                    $seen[] = $value;
+
+                    return $value === 11;
+                })
+                ->toArray(),
+        );
+        self::assertSame([1, 11], $seen);
+    }
+
     public function testUntilBeforeFlatMapFullyExpandsTheMatchingValueThenStopsTheSource(): void
     {
         $events = [];
@@ -178,6 +220,46 @@ final class SequenceStreamingTest extends TestCase
         );
         self::assertSame([], $events);
         self::assertSame(0, $untilCalls);
+    }
+
+    public function testSkipUntilAfterTakeReadsOnlyTakenValuesAndTakeZeroReadsNothing(): void
+    {
+        $seen = [];
+        $source = static function () use (&$seen): iterable {
+            foreach ([1, 2, 3] as $value) {
+                $seen[] = $value;
+                yield $value;
+            }
+        };
+
+        self::assertSame(
+            [],
+            Sequence::from($source())
+                ->take(1)
+                ->skipUntil(static function (mixed $value) use (&$seen): bool {
+                    $seen[] = 'skipUntil:' . $value;
+
+                    return false;
+                })
+                ->toArray(),
+        );
+        self::assertSame([1, 'skipUntil:1'], $seen);
+
+        $events = [];
+        $skipUntilCalls = 0;
+        self::assertSame(
+            [],
+            Sequence::from(new SequenceRecordingIterator([1], $events, 'source'))
+                ->take(0)
+                ->skipUntil(static function () use (&$skipUntilCalls): bool {
+                    ++$skipUntilCalls;
+
+                    return true;
+                })
+                ->toArray(),
+        );
+        self::assertSame([], $events);
+        self::assertSame(0, $skipUntilCalls);
     }
 
     public function testTakeAfterFlatMapStopsBeforeEitherInputAdvances(): void
