@@ -16,6 +16,7 @@
       "Itera\\": "src/"
     },
     "files": [
+      "src/Aggregator/functions.php",
       "src/Pipe/functions.php"
     ]
   },

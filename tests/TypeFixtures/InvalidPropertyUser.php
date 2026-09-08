@@ -1,0 +1,12 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Itera\Tests\TypeFixtures;
+
+final class InvalidPropertyUser
+{
+    public function __construct(
+        public readonly bool $active = true,
+    ) {}
+}

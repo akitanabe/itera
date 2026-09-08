@@ -77,6 +77,42 @@ final class SequenceTerminalTest extends TestCase
         }));
     }
 
+    public function testFoldSupportsAMutableAccumulatorWithoutChangingItsIdentity(): void
+    {
+        /** @var \ArrayObject<int, int> $initial */
+        $initial = new \ArrayObject();
+        $result = Sequence::from([1, 2])->fold($initial, static function (
+            \ArrayObject $state,
+            int $value,
+        ): \ArrayObject {
+            $state[] = $value;
+
+            return $state;
+        });
+
+        self::assertSame($initial, $result);
+        self::assertSame([1, 2], $result->getArrayCopy());
+    }
+
+    public function testFoldSourceExceptionsKeepTheirIdentityAndLeaveTheSequenceConsumed(): void
+    {
+        $expected = new \RuntimeException('fold source failed');
+        $source = static function () use ($expected): iterable {
+            yield 1;
+            throw $expected;
+        };
+        $sequence = Sequence::from($source());
+
+        try {
+            $sequence->fold(0, static fn(int $state, int $value): int => $state + $value);
+            self::fail('The source exception was not thrown.');
+        } catch (\RuntimeException $actual) {
+            self::assertSame($expected, $actual);
+        }
+
+        $this->assertConsumed($sequence);
+    }
+
     public function testTerminalCallbackAndSourceExceptionsKeepTheirIdentity(): void
     {
         $expected = new \RuntimeException('fold failed');

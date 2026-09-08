@@ -271,6 +271,21 @@ final class Sequence implements IteratorAggregate
     }
 
     /**
+     * Consumes the pipeline outputs with a reusable built-in aggregation.
+     *
+     * @template R
+     * @param Aggregator<T, R> $aggregator
+     * @return R
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     */
+    public function aggregate(Aggregator $aggregator): mixed
+    {
+        $values = $this->beginConsumption();
+
+        return $aggregator->execute($values);
+    }
+
+    /**
      * Consumes the sequence immediately when called, resolving input
      * IteratorAggregate instances then. Values from the returned iterator are
      * read lazily. Source exceptions are propagated unchanged, and the

@@ -1,0 +1,21 @@
+services:
+    -
+        class: Itera\PHPStan\AggregatorContextVisitor
+        tags:
+            - phpstan.parser.richParserNodeVisitor
+    -
+        class: Itera\PHPStan\AggregatorCallbackTypeExtension
+        tags:
+            - phpstan.functionParameterClosureTypeExtension
+    -
+        class: Itera\PHPStan\AggregatorFunctionReturnTypeExtension
+        tags:
+            - phpstan.broker.dynamicFunctionReturnTypeExtension
+    -
+        class: Itera\PHPStan\CollectFunctionReturnTypeExtension
+        tags:
+            - phpstan.broker.dynamicFunctionReturnTypeExtension
+    -
+        class: Itera\PHPStan\SequenceAggregateReturnTypeExtension
+        tags:
+            - phpstan.broker.dynamicMethodReturnTypeExtension
