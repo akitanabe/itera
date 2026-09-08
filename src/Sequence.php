@@ -7,7 +7,10 @@ namespace Itera;
 use Closure;
 use Generator;
 use InvalidArgumentException;
-use Iterator;
+use Itera\Internal\SequenceInputFrame;
+use Itera\Internal\SequenceOperation;
+use Itera\Internal\SequencePipeline;
+use Itera\Internal\SequenceStep;
 use IteratorAggregate;
 use Traversable;
 use TypeError;
@@ -18,7 +21,6 @@ use TypeError;
  * reused after early termination or an exception. Source and callback
  * exceptions are propagated unchanged.
  *
- * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:kan-defect
  * @mago-expect lint:too-many-methods
  *
@@ -30,10 +32,12 @@ final class Sequence implements IteratorAggregate
     /** @var iterable<mixed> */
     private iterable $source;
 
-    /** @var list<Closure(iterable<mixed>): iterable<mixed>> */
+    /** @var list<Closure(mixed, int): SequenceStep> */
     private array $operations = [];
 
     private bool $consumed = false;
+
+    private bool $emptyResult = false;
 
     /**
      * @param iterable<T> $values
@@ -97,9 +101,7 @@ final class Sequence implements IteratorAggregate
     public function map(callable $mapper): self
     {
         $this->assertNotConsumed();
-        $this->operations[] = function (iterable $source) use ($mapper): iterable {
-            return $this->mapValues($source, $mapper);
-        };
+        $this->operations[] = SequenceOperation::map($mapper);
 
         return $this;
     }
@@ -115,9 +117,7 @@ final class Sequence implements IteratorAggregate
     public function filter(callable $predicate): self
     {
         $this->assertNotConsumed();
-        $this->operations[] = function (iterable $source) use ($predicate): iterable {
-            return $this->filterValues($source, $predicate);
-        };
+        $this->operations[] = SequenceOperation::filter($predicate);
 
         return $this;
     }
@@ -139,9 +139,7 @@ final class Sequence implements IteratorAggregate
     public function flatMap(callable $mapper): self
     {
         $this->assertNotConsumed();
-        $this->operations[] = function (iterable $source) use ($mapper): iterable {
-            return $this->flatMapValues($source, $mapper);
-        };
+        $this->operations[] = SequenceOperation::flatMap($mapper);
 
         return $this;
     }
@@ -157,9 +155,13 @@ final class Sequence implements IteratorAggregate
     {
         $this->assertNotConsumed();
         $this->assertNonNegative($count);
-        $this->operations[] = function (iterable $source) use ($count): iterable {
-            return $this->takeValues($source, $count);
-        };
+        if ($count === 0) {
+            $this->emptyResult = true;
+
+            return $this;
+        }
+
+        $this->operations[] = SequenceOperation::take($count);
 
         return $this;
     }
@@ -175,9 +177,7 @@ final class Sequence implements IteratorAggregate
     {
         $this->assertNotConsumed();
         $this->assertNonNegative($count);
-        $this->operations[] = function (iterable $source) use ($count): iterable {
-            return $this->dropValues($source, $count);
-        };
+        $this->operations[] = SequenceOperation::drop($count);
 
         return $this;
     }
@@ -192,7 +192,7 @@ final class Sequence implements IteratorAggregate
     public function toArray(): array
     {
         $values = [];
-        foreach ($this->iterate($this->beginConsumption()) as $value) {
+        foreach ($this->beginConsumption() as $value) {
             $values[] = $value;
         }
 
@@ -209,7 +209,7 @@ final class Sequence implements IteratorAggregate
     public function toCollection(): Collection
     {
         $values = [];
-        foreach ($this->iterate($this->beginConsumption()) as $value) {
+        foreach ($this->beginConsumption() as $value) {
             $values[] = $value;
         }
 
@@ -225,7 +225,7 @@ final class Sequence implements IteratorAggregate
      */
     public function first(): mixed
     {
-        $values = $this->iterate($this->beginConsumption());
+        $values = $this->beginConsumption();
         if (!$values->valid()) {
             return null;
         }
@@ -242,7 +242,7 @@ final class Sequence implements IteratorAggregate
     public function count(): int
     {
         $count = 0;
-        foreach ($this->iterate($this->beginConsumption()) as $_value) {
+        foreach ($this->beginConsumption() as $_value) {
             ++$count;
         }
 
@@ -260,7 +260,7 @@ final class Sequence implements IteratorAggregate
      */
     public function any(callable $predicate): bool
     {
-        foreach ($this->iterate($this->beginConsumption()) as $value) {
+        foreach ($this->beginConsumption() as $value) {
             if ($this->requireBoolean($predicate($value), 'any')) {
                 return true;
             }
@@ -280,7 +280,7 @@ final class Sequence implements IteratorAggregate
      */
     public function all(callable $predicate): bool
     {
-        foreach ($this->iterate($this->beginConsumption()) as $value) {
+        foreach ($this->beginConsumption() as $value) {
             if (!$this->requireBoolean($predicate($value), 'all')) {
                 return false;
             }
@@ -302,7 +302,7 @@ final class Sequence implements IteratorAggregate
     public function fold(mixed $initial, callable $step): mixed
     {
         $state = $initial;
-        foreach ($this->iterate($this->beginConsumption()) as $value) {
+        foreach ($this->beginConsumption() as $value) {
             $state = $step($state, $value);
         }
 
@@ -320,32 +320,29 @@ final class Sequence implements IteratorAggregate
      */
     public function getIterator(): Traversable
     {
-        return $this->iterate($this->beginConsumption());
+        return $this->beginConsumption();
     }
 
     private function __clone(): void {}
 
     /**
-     * @return iterable<T>
+     * @mago-expect lint:inline-variable-return
+     * @return Generator<int, T, void, void>
      */
-    private function beginConsumption(): iterable
+    private function beginConsumption(): Generator
     {
         $this->assertNotConsumed();
         $this->consumed = true;
 
         // Deferring resolution until iteration would skip it for take(0).
-        $this->source = $this->resolveSource($this->source);
-        $values = $this->source;
-        foreach ($this->operations as $operation) {
-            $values = $operation($values);
-        }
+        $this->source = SequenceInputFrame::resolve($this->source);
+        $pipeline = new SequencePipeline($this->source, $this->operations, $this->emptyResult);
         $this->operations = [];
 
-        /**
-         * Restore the current public element type after type-erased assembly.
-         * @var iterable<T> $values
-         */
-        return $values;
+        /** @var Generator<int, T, void, void> $iterator */
+        $iterator = $pipeline->getIterator();
+
+        return $iterator;
     }
 
     private function assertNotConsumed(): void
@@ -369,133 +366,5 @@ final class Sequence implements IteratorAggregate
         }
 
         return $result;
-    }
-
-    /**
-     * @template V
-     * @param iterable<V> $source
-     * @return iterable<V>
-     */
-    private function resolveSource(iterable $source): iterable
-    {
-        while ($source instanceof IteratorAggregate) {
-            $source = $source->getIterator();
-        }
-
-        return $source;
-    }
-
-    /**
-     * @template V
-     * @param iterable<V> $source
-     * @return Generator<int, V, void, void>
-     */
-    private function iterate(iterable $source): Generator
-    {
-        $index = 0;
-
-        if ($source instanceof Iterator) {
-            while ($source->valid()) {
-                yield $index++ => $source->current();
-                $source->next();
-            }
-
-            return;
-        }
-
-        foreach ($source as $value) {
-            yield $index++ => $value;
-        }
-    }
-
-    /**
-     * @template I
-     * @template O
-     * @param iterable<I> $source
-     * @param callable(I): O $mapper
-     * @return Generator<int, O, void, void>
-     */
-    private function mapValues(iterable $source, callable $mapper): Generator
-    {
-        foreach ($this->iterate($source) as $value) {
-            yield $mapper($value);
-        }
-    }
-
-    /**
-     * @template V
-     * @param iterable<V> $source
-     * @param callable(V): mixed $predicate
-     * @return Generator<int, V, void, void>
-     */
-    private function filterValues(iterable $source, callable $predicate): Generator
-    {
-        foreach ($this->iterate($source) as $value) {
-            $accepted = $predicate($value);
-            if (!is_bool($accepted)) {
-                throw new TypeError('Sequence filter predicate must return bool.');
-            }
-
-            if ($accepted) {
-                yield $value;
-            }
-        }
-    }
-
-    /**
-     * @template I
-     * @param iterable<I> $source
-     * @param callable(I): mixed $mapper
-     * @return Generator<int, mixed, void, void>
-     */
-    private function flatMapValues(iterable $source, callable $mapper): Generator
-    {
-        foreach ($this->iterate($source) as $value) {
-            $inner = $mapper($value);
-            if (!is_iterable($inner)) {
-                throw new TypeError('Sequence flatMap mapper must return iterable.');
-            }
-
-            foreach ($this->iterate($this->resolveSource($inner)) as $innerValue) {
-                yield $innerValue;
-            }
-        }
-    }
-
-    /**
-     * @param iterable<mixed> $source
-     * @return Generator<int, mixed, void, void>
-     */
-    private function takeValues(iterable $source, int $count): Generator
-    {
-        if ($count === 0) {
-            return;
-        }
-
-        $taken = 0;
-        foreach ($this->iterate($source) as $value) {
-            yield $value;
-            ++$taken;
-            if ($taken === $count) {
-                return;
-            }
-        }
-    }
-
-    /**
-     * @param iterable<mixed> $source
-     * @return Generator<int, mixed, void, void>
-     */
-    private function dropValues(iterable $source, int $count): Generator
-    {
-        $dropped = 0;
-        foreach ($this->iterate($source) as $value) {
-            if ($dropped < $count) {
-                ++$dropped;
-                continue;
-            }
-
-            yield $value;
-        }
     }
 }

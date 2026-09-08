@@ -11,6 +11,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use TypeError;
 
+/** @mago-expect lint:too-many-methods */
 final class SequenceOperatorTest extends TestCase
 {
     public function testOperatorsMutateTheSameSequenceWithoutEvaluatingIt(): void
@@ -155,6 +156,26 @@ final class SequenceOperatorTest extends TestCase
         }
 
         self::assertSame([1, 2], iterator_to_array($sequence));
+    }
+
+    public function testTakeZeroDoesNotSkipLaterCountValidationOrConsumedChecks(): void
+    {
+        $sequence = Sequence::of(1)->take(0);
+        foreach (['take', 'drop'] as $method) {
+            try {
+                $sequence->{$method}(-1);
+                self::fail($method . ' accepted a negative count after take(0).');
+            } catch (InvalidArgumentException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+        self::assertSame([], $sequence->toArray());
+
+        $sequence = Sequence::of(1)->take(0);
+        $sequence->getIterator();
+
+        $this->expectException(SequenceConsumedException::class);
+        $sequence->take(-1);
     }
 
     public function testTakeAndDropMayExceedTheInputLength(): void

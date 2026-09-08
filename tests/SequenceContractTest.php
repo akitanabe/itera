@@ -12,6 +12,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 
+/** @mago-expect lint:too-many-methods */
 final class SequenceContractTest extends TestCase
 {
     public function testToCollectionAlwaysCreatesANewCollection(): void
@@ -70,6 +71,19 @@ final class SequenceContractTest extends TestCase
         unset($mapper);
 
         self::assertSame([1], $sequence->toArray());
+
+        self::assertNull($mapperReference->get());
+    }
+
+    public function testCallbackIsReleasedAfterAStoredOutputIteratorCompletes(): void
+    {
+        $mapper = static fn(int $value): int => $value;
+        $mapperReference = \WeakReference::create($mapper);
+        $sequence = Sequence::from([1])->map($mapper);
+        unset($mapper);
+
+        $iterator = $sequence->getIterator();
+        self::assertSame([1], iterator_to_array($iterator));
 
         self::assertNull($mapperReference->get());
     }
