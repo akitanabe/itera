@@ -59,6 +59,96 @@ final class SequenceOperatorTest extends TestCase
         self::assertSame([1, 1], $argumentCounts);
     }
 
+    public function testUntilIncludesTheFirstMatchingValueAndHandlesBoundaries(): void
+    {
+        self::assertSame([1], Sequence::from([1, 2, 3])->until(static fn(int $value): bool => $value === 1)->toArray());
+        self::assertSame(
+            [1, 2, 3],
+            Sequence::from([1, 2, 3])->until(static fn(int $value): bool => $value === 3)->toArray(),
+        );
+        self::assertSame(
+            [1, 2],
+            Sequence::from([1, 2, 3])->until(static fn(int $value): bool => $value === 2)->toArray(),
+        );
+        self::assertSame(
+            [1, 2, 3],
+            Sequence::from([1, 2, 3])->until(static fn(int $value): bool => $value === 9)->toArray(),
+        );
+        self::assertSame(
+            [],
+            Sequence::empty()
+                ->until(static fn(mixed $value): bool => true)
+                ->toArray(),
+        );
+    }
+
+    public function testUntilIsLazyMutableAndReceivesOnlyTheValue(): void
+    {
+        $calls = [];
+        $sequence = Sequence::from(
+            (static function () use (&$calls): iterable {
+                $calls[] = 'source';
+                yield 1;
+                $calls[] = 'after';
+                yield 2;
+            })(),
+        );
+
+        self::assertSame($sequence, $sequence->until(static function (int $value) use (&$calls): bool {
+            $calls[] = ['until', $value, func_num_args()];
+
+            return $value === 2;
+        }));
+        self::assertSame([], $calls);
+
+        $iterator = $sequence->getIterator();
+        self::assertCount(0, $calls);
+        self::assertSame([1, 2], iterator_to_array($iterator));
+        self::assertSame(['source', ['until', 1, 1], 'after', ['until', 2, 1]], $calls);
+    }
+
+    public function testUntilPreservesNullAndFalseValues(): void
+    {
+        self::assertSame(
+            [null, false],
+            Sequence::of(null, false, 'later')->until(static fn(mixed $value): bool => $value === false)->toArray(),
+        );
+    }
+
+    public function testUntilRejectsNonBooleanResultsAndConsumesTheSequence(): void
+    {
+        $sequence = Sequence::from([1]);
+        $until = new ReflectionMethod($sequence, 'until');
+        $until->invoke($sequence, static fn(mixed $value): int => is_int($value) ? $value : 0);
+
+        try {
+            $sequence->toArray();
+            self::fail('A non-boolean predicate result was accepted.');
+        } catch (\Throwable $exception) {
+            self::assertInstanceOf(TypeError::class, $exception);
+        }
+
+        $this->expectException(SequenceConsumedException::class);
+        $sequence->map(static fn(mixed $value): mixed => $value);
+    }
+
+    public function testUntilRunsAfterMapAndFilterInDeclarationOrder(): void
+    {
+        $seen = [];
+        $values = Sequence::from([1, 2, 3])
+            ->map(static fn(int $value): int => $value * 10)
+            ->filter(static fn(int $value): bool => $value >= 20)
+            ->until(static function (int $value) use (&$seen): bool {
+                $seen[] = $value;
+
+                return $value === 20;
+            })
+            ->toArray();
+
+        self::assertSame([20], $values);
+        self::assertSame([20], $seen);
+    }
+
     public function testFlatMapStreamsIterableValuesAndDiscardsEveryKey(): void
     {
         $argumentCounts = [];

@@ -98,6 +98,9 @@ final class SequenceContractTest extends TestCase
         yield 'filter' => [
             static fn(Sequence $sequence): mixed => $sequence->filter(static fn(mixed $value): bool => true),
         ];
+        yield 'until' => [
+            static fn(Sequence $sequence): mixed => $sequence->until(static fn(mixed $value): bool => true),
+        ];
         yield 'flatMap' => [
             static fn(Sequence $sequence): mixed => $sequence->flatMap(static fn(mixed $value): iterable => [$value]),
         ];
@@ -132,6 +135,14 @@ final class SequenceContractTest extends TestCase
             static fn(Sequence $sequence, \RuntimeException $exception): Sequence => $sequence->flatMap(
                 static fn(mixed $value): iterable => self::throwAsIterable($exception),
             ),
+        ];
+        yield 'until' => [
+            static fn(
+                Sequence $sequence,
+                \RuntimeException $exception,
+            ): Sequence => $sequence->until(static function () use ($exception): never {
+                throw $exception;
+            }),
         ];
     }
 

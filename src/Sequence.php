@@ -123,6 +123,23 @@ final class Sequence implements IteratorAggregate
     }
 
     /**
+     * Lazily includes values through the first value for which the predicate
+     * returns an actual bool true, then stops reading the source.
+     *
+     * @param callable(T): bool $predicate
+     * @return $this
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     * @throws TypeError If the predicate returns a non-boolean value.
+     */
+    public function until(callable $predicate): self
+    {
+        $this->assertNotConsumed();
+        $this->operations[] = SequenceOperation::until($predicate);
+
+        return $this;
+    }
+
+    /**
      * Lazily replaces each value with the values of an iterable and returns
      * this same mutable sequence.
      *

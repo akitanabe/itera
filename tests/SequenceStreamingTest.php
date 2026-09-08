@@ -49,6 +49,137 @@ final class SequenceStreamingTest extends TestCase
         );
     }
 
+    public function testUntilStopsTheSourceAfterTheMatchingValueWithoutAdvancingIt(): void
+    {
+        $events = [];
+        $source = new SequenceRecordingIterator([1, 2, 3], $events, 'source');
+
+        self::assertSame(
+            [1, 2],
+            Sequence::from($source)
+                ->until(static fn(mixed $value): bool => $value === 2)
+                ->toArray(),
+        );
+        self::assertSame(
+            ['source:valid:0', 'source:current:0', 'source:next:0', 'source:valid:1', 'source:current:1'],
+            $events,
+        );
+    }
+
+    public function testUntilBeforeFlatMapFullyExpandsTheMatchingValueThenStopsTheSource(): void
+    {
+        $events = [];
+        $source = new SequenceRecordingIterator([1, 2, 3], $events, 'source');
+
+        self::assertSame(
+            [1, 11, 2, 12],
+            Sequence::from($source)
+                ->until(static fn(mixed $value): bool => $value === 2)
+                ->flatMap(static fn(mixed $value): iterable => $value === 1 ? [$value, 11] : [$value, 12])
+                ->toArray(),
+        );
+        self::assertSame(
+            ['source:valid:0', 'source:current:0', 'source:next:0', 'source:valid:1', 'source:current:1'],
+            $events,
+        );
+    }
+
+    public function testUntilAfterFlatMapStopsInsideTheMatchingExpansionAndThenTheParent(): void
+    {
+        $events = [];
+        $source = new SequenceRecordingIterator([1, 2, 3], $events, 'source');
+
+        self::assertSame(
+            [1, 11, 2],
+            Sequence::from($source)
+                ->flatMap(static function (mixed $value) use (&$events): iterable {
+                    $name = $value === 1 ? 'inner:1' : 'inner:2';
+                    $values = $value === 1 ? [1, 11] : [2, 12];
+
+                    return new SequenceRecordingIterator($values, $events, $name);
+                })
+                ->until(static fn(mixed $value): bool => $value === 2)
+                ->toArray(),
+        );
+        self::assertSame(
+            [
+                'source:valid:0',
+                'source:current:0',
+                'inner:1:valid:0',
+                'inner:1:current:0',
+                'inner:1:next:0',
+                'inner:1:valid:1',
+                'inner:1:current:1',
+                'inner:1:next:1',
+                'inner:1:valid:2',
+                'source:next:0',
+                'source:valid:1',
+                'source:current:1',
+                'inner:2:valid:0',
+                'inner:2:current:0',
+            ],
+            $events,
+        );
+    }
+
+    public function testDownstreamFilteringOrEmptyExpansionAfterUntilCannotReadAnotherSourceValue(): void
+    {
+        foreach ([
+            static fn(Sequence $sequence): Sequence => $sequence->filter(static fn(): bool => false),
+            static fn(Sequence $sequence): Sequence => $sequence->flatMap(static fn(): iterable => []),
+        ] as $operation) {
+            $events = [];
+            $source = new SequenceRecordingIterator([1, 2, 3], $events, 'source');
+            $sequence = Sequence::from($source)->until(static fn(mixed $value): bool => $value === 2);
+
+            self::assertSame([], $operation($sequence)->toArray());
+            self::assertSame(
+                ['source:valid:0', 'source:current:0', 'source:next:0', 'source:valid:1', 'source:current:1'],
+                $events,
+            );
+        }
+    }
+
+    public function testUntilAfterTakeReadsOnlyTheTakenValuesAndTakeZeroReadsNothing(): void
+    {
+        $seen = [];
+        $source = static function () use (&$seen): iterable {
+            foreach ([1, 2, 3] as $value) {
+                $seen[] = $value;
+                yield $value;
+            }
+        };
+
+        self::assertSame(
+            [1],
+            Sequence::from($source())
+                ->take(1)
+                ->until(static function (mixed $value) use (&$seen): bool {
+                    $seen[] = 'until:' . $value;
+
+                    return false;
+                })
+                ->toArray(),
+        );
+        self::assertSame([1, 'until:1'], $seen);
+
+        $events = [];
+        $untilCalls = 0;
+        self::assertSame(
+            [],
+            Sequence::from(new SequenceRecordingIterator([1], $events, 'source'))
+                ->take(0)
+                ->until(static function () use (&$untilCalls): bool {
+                    ++$untilCalls;
+
+                    return true;
+                })
+                ->toArray(),
+        );
+        self::assertSame([], $events);
+        self::assertSame(0, $untilCalls);
+    }
+
     public function testTakeAfterFlatMapStopsBeforeEitherInputAdvances(): void
     {
         $events = [];

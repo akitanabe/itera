@@ -30,6 +30,19 @@ final class SequenceOperation
     }
 
     /** @return Closure(mixed, int): SequenceStep */
+    public static function until(callable $predicate): Closure
+    {
+        return static function (mixed $value, int $_position) use ($predicate): SequenceStep {
+            $matches = $predicate($value);
+            if (!is_bool($matches)) {
+                throw new TypeError('Sequence until predicate must return bool.');
+            }
+
+            return $matches ? SequenceStep::stopUpstream($value) : SequenceStep::forward($value);
+        };
+    }
+
+    /** @return Closure(mixed, int): SequenceStep */
     public static function flatMap(callable $mapper): Closure
     {
         return static function (mixed $value, int $_position) use ($mapper): SequenceStep {

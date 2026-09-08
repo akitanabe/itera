@@ -34,7 +34,7 @@ $user = $usersById->get('u1');
 
 ### Sequence
 
-`Sequence<T>` は mutable で一度だけ消費できる遅延変換パイプラインです。`Collection` の `sequence()` または任意の `iterable` から生成できます。`map`、`filter`、`flatMap`、`take`、`drop` は同じ `Sequence` を更新し、終端処理または `foreach` が始まるまで source や callback を実行しません。
+`Sequence<T>` は mutable で一度だけ消費できる遅延変換パイプラインです。`Collection` の `sequence()` または任意の `iterable` から生成できます。`map`、`filter`、`flatMap`、`until`、`take`、`drop` は同じ `Sequence` を更新し、終端処理または `foreach` が始まるまで source や callback を実行しません。
 
 ```php
 $result = Sequence::from($users)
@@ -45,11 +45,13 @@ $result = Sequence::from($users)
     ->toCollection();
 ```
 
-終端処理は `toArray()`、`toCollection()`、`first()`、`count()`、`any()`、`all()`、`fold()`、`getIterator()` です。`foreach` でも最終出力を list key で順に取得できます。`getIterator()` は返した iterator を進める前でも、呼び出した時点で `Sequence` を使用済みにします。`first()`、`any()`、`all()` は結果が確定すると source の読み取りを停止し、`any()` と `all()` の predicate は実際の `bool` を返す必要があります。`fold($initial, $step)` は `step($state, $value)` を順に適用します。
+`until($predicate)` は最初に predicate が `true` を返した値までを含めて下流へ送り、その後の upstream の読み取りを停止します。一致する値がなければ最後まで値を送り、predicate は値だけを受け取り実際の `bool` を返す必要があります。
+
+終端処理は `toArray()`、`toCollection()`、`first()`、`count()`、`any()`、`all()`、`fold()`、`getIterator()` です。`foreach` でも最終出力を list key で順に取得できます。`getIterator()` は返した iterator を進める前でも、呼び出した時点で `Sequence` を使用済みにします。`first()`、`any()`、`all()` は結果が確定すると source の読み取りを停止し、`any()` と `all()` の predicate も実際の `bool` を返す必要があります。`fold($initial, $step)` は `step($state, $value)` を順に適用します。
 
 どの終端処理も呼び出した時点で消費を開始します。source や callback の例外はそのまま伝播し、途中終了や例外の後を含め、消費を開始した `Sequence` は再利用できません。`map()` や `flatMap()` による同一インスタンス上の型変更は静的解析できますが、変更前に保持した別名参照の型には解析上の制限があります。
 
-`toArray()`、`toCollection()`、`count()`、`fold()` は結果を最後まで消費するため、無限 source では終了しません。必要に応じて先に `take()` で有限化します。
+`toArray()`、`toCollection()`、`count()`、`fold()` は結果を最後まで消費するため、無限 source では終了しません。`until()` も一致する値がない無限 source では終了しません。必要に応じて先に `take()` で有限化します。
 
 ### 採用範囲
 

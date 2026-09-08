@@ -43,6 +43,43 @@ final class SequenceTypeTest extends TypeInferenceTestCase
         self::assertSame([1.0, 2.0], iterator_to_array($floats));
     }
 
+    public function testUntilPreservesTheElementType(): void
+    {
+        $sequence = Sequence::from([1, 2])->until(static fn(int $value): bool => $value === 2);
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Sequence<int>', $sequence);
+        }
+
+        self::assertSame([1, 2], $sequence->toArray());
+    }
+
+    public function testUntilPreservesTheElementTypeAfterMap(): void
+    {
+        $sequence = Sequence::from([1, 2])->map(static fn(int $value): string => (string) $value)->until(
+            static fn(string $value): bool => $value === '2',
+        );
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Sequence<decimal-int-string>', $sequence);
+        }
+
+        self::assertSame(['1', '2'], $sequence->toArray());
+    }
+
+    public function testUntilPreservesTheElementTypeAfterFlatMap(): void
+    {
+        $sequence = Sequence::from([1, 2])->flatMap(static fn(int $value): iterable => [(float) $value])->until(
+            static fn(float $value): bool => $value === 2.0,
+        );
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Sequence<float>', $sequence);
+        }
+
+        self::assertSame([1.0, 2.0], $sequence->toArray());
+    }
+
     public function testTerminalResultTypesRemainVisibleToStaticAnalysis(): void
     {
         $sequence = Sequence::from([1, 2]);
