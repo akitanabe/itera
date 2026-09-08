@@ -13,6 +13,10 @@ use Itera\SequenceConsumedException;
 use PHPUnit\Framework\TestCase;
 use ReflectionFunction;
 
+use function Itera\Aggregator\collect as collectWith;
+use function Itera\Aggregator\count as countWith;
+use function Itera\Pipe\aggregate;
+use function Itera\Pipe\associate;
 use function Itera\Pipe\collect;
 use function Itera\Pipe\drop;
 use function Itera\Pipe\filter;
@@ -50,6 +54,8 @@ final class PipeTest extends TestCase
             skipUntil(static fn(int $value): bool => $value > 0),
             take(1),
             drop(1),
+            aggregate(countWith()),
+            associate(static fn(int $value): string => (string) $value),
             collect(),
             fold(0, static fn(int $state, int $value): int => $state + $value),
             getIterator(),
@@ -297,6 +303,78 @@ final class PipeTest extends TestCase
         self::assertSame(['read'], $events);
     }
 
+    public function testAggregateFactoryIsLazyAndReusableAcrossSequences(): void
+    {
+        $events = [];
+        $predicateCalls = 0;
+        $source = static function () use (&$events): iterable {
+            $events[] = 'source';
+            yield 1;
+            yield 2;
+        };
+        $definition = collectWith();
+        $materialize = aggregate($definition);
+        $hasValue = aggregate(\Itera\Aggregator\any(static function () use (&$predicateCalls): bool {
+            $predicateCalls++;
+
+            return true;
+        }));
+
+        self::assertSame([], $events);
+        self::assertSame(0, $predicateCalls);
+        self::assertSame([1, 2], (Sequence::from($source()) |> $materialize)->values());
+        self::assertSame(['source'], $events);
+        self::assertSame(['other'], (Sequence::of('other') |> $materialize)->values());
+        self::assertTrue(Sequence::of('first') |> $hasValue);
+        self::assertTrue(Sequence::of('second') |> $hasValue);
+        self::assertSame(2, $predicateCalls);
+    }
+
+    public function testAssociateSelectsKeysWhenAppliedAndKeepsTheLastDuplicate(): void
+    {
+        $calls = [];
+        $byLength = associate(static function (string $value) use (&$calls): int {
+            $calls[] = $value;
+
+            return strlen($value);
+        });
+
+        self::assertSame([], $calls);
+        self::assertSame(
+            [3 => 'two', 5 => 'three'],
+            (Sequence::from(self::strings('one', 'two', 'three')) |> $byLength)->raw(),
+        );
+        self::assertSame(['one', 'two', 'three'], $calls);
+        self::assertSame([1 => 'a'], (Sequence::from(self::strings('a')) |> $byLength)->raw());
+
+        $consumed = Sequence::from(self::strings('used'));
+        $consumed->collect();
+        $this->expectExceptionFrom(static fn(): \Itera\Map => $consumed |> $byLength, SequenceConsumedException::class);
+    }
+
+    public function testAggregateRejectsConsumedInputAndPreservesCallbackExceptionIdentity(): void
+    {
+        $count = aggregate(countWith());
+        $consumed = Sequence::of(1);
+        $consumed->collect();
+        $this->expectExceptionFrom(static fn(): int => $consumed |> $count, SequenceConsumedException::class);
+
+        $expected = new \RuntimeException('aggregate callback failed');
+        $fails = aggregate(\Itera\Aggregator\any(static function () use ($expected): never {
+            throw $expected;
+        }));
+        $sequence = Sequence::of(1);
+
+        try {
+            $sequence |> $fails;
+            self::fail('The callback exception was not thrown.');
+        } catch (\RuntimeException $actual) {
+            self::assertSame($expected, $actual);
+        }
+
+        $this->assertConsumed($sequence);
+    }
+
     public function testValidationAndFailuresOccurAtApplicationOrConsumption(): void
     {
         $negativeTake = take(-1);
@@ -370,6 +448,12 @@ final class PipeTest extends TestCase
 
     /** @return iterable<int> */
     private static function integers(int ...$values): iterable
+    {
+        yield from $values;
+    }
+
+    /** @return iterable<string> */
+    private static function strings(string ...$values): iterable
     {
         yield from $values;
     }

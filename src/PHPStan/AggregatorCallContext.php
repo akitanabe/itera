@@ -17,17 +17,26 @@ final class AggregatorCallContext
 {
     public static function inputType(FuncCall $functionCall, Scope $scope): ?Type
     {
-        $receiver = $functionCall->getAttribute(AggregatorContextVisitor::RECEIVER_ATTRIBUTE);
-        if (!$receiver instanceof Expr) {
+        $inputType = self::receiverInputType($functionCall, $scope);
+        if ($inputType === null) {
             return null;
         }
-
         $callback = $functionCall->getArgs()[0]->value ?? null;
         if (!$callback instanceof ArrowFunction && !$callback instanceof Closure) {
             return null;
         }
 
         if (($callback->params[0]->type ?? null) !== null) {
+            return null;
+        }
+
+        return $inputType;
+    }
+
+    public static function receiverInputType(FuncCall $functionCall, Scope $scope): ?Type
+    {
+        $receiver = $functionCall->getAttribute(AggregatorContextVisitor::RECEIVER_ATTRIBUTE);
+        if (!$receiver instanceof Expr) {
             return null;
         }
 

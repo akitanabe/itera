@@ -4,8 +4,16 @@ declare(strict_types=1);
 
 namespace Itera\Tests;
 
+use Itera\Sequence;
 use PHPStan\Testing\TypeInferenceTestCase;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 
+use function Itera\Aggregator\any as anyWith;
+use function Itera\Aggregator\associate as associateWith;
+use function Itera\Aggregator\collect as collectWith;
+use function Itera\Aggregator\count as countWith;
+use function Itera\Pipe\aggregate;
+use function Itera\Pipe\associate;
 use function Itera\Pipe\collect;
 use function Itera\Pipe\drop;
 use function Itera\Pipe\filter;
@@ -21,6 +29,13 @@ use function PHPStan\Testing\assertType;
 
 final class PipeTypeTest extends TypeInferenceTestCase
 {
+    /** @return list<string> */
+    public static function getAdditionalConfigFiles(): array
+    {
+        return array_values([...parent::getAdditionalConfigFiles(), __DIR__ . '/../phpstan-extension.neon']);
+    }
+
+    #[RunInSeparateProcess]
     public function testInferredTypesMatchTheDeclaredExpectations(): void
     {
         foreach (self::gatherAssertTypes(__FILE__) as $assertion) {
@@ -116,6 +131,52 @@ final class PipeTypeTest extends TypeInferenceTestCase
         self::assertSame(['a'], $stringCollection->values());
         self::assertSame([3], iterator_to_array($integerIterator));
         self::assertSame(['c'], iterator_to_array($stringIterator));
+    }
+
+    public function testAggregateAndAssociatePreserveTerminalResultTypes(): void
+    {
+        $user = new PipeTypeUser(1, true);
+        /** @var iterable<int> $values */
+        $values = [1, 2];
+        $collection = $values |> sequence() |> aggregate(collectWith());
+        $map = [$user] |> sequence() |> aggregate(associateWith(static fn($value) => $value->id));
+        $matched = [$user] |> sequence() |> aggregate(anyWith(static fn($value) => $value->active));
+        $count = [$user] |> sequence() |> aggregate(countWith());
+        $associated = [$user] |> sequence() |> associate(static fn($value) => $value->id);
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Collection<int>', $collection);
+            assertType('Itera\\Map<int, Itera\\Tests\\PipeTypeUser>', $map);
+            assertType('bool', $matched);
+            assertType('int', $count);
+            assertType('Itera\\Map<int, Itera\\Tests\\PipeTypeUser>', $associated);
+        }
+
+        self::assertSame([1, 2], $collection->values());
+    }
+
+    public function testSavedAggregateClosuresPreserveDefinitionsAndPolymorphicCollect(): void
+    {
+        $collect = collectWith();
+        $alias = $collect;
+        $materialize = aggregate($collect);
+        $materializeAlias = aggregate($alias);
+        $hasPositive = aggregate(anyWith(static fn(int $value): bool => $value > 0));
+        $byValue = associate(static fn(int $value): string => (string) $value);
+
+        $integers = Sequence::from([1]) |> $materialize;
+        $strings = Sequence::from(['value']) |> $materializeAlias;
+        $matched = Sequence::from([1]) |> $hasPositive;
+        $map = Sequence::from([1]) |> $byValue;
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Collection<int>', $integers);
+            assertType('Itera\\Collection<string>', $strings);
+            assertType('bool', $matched);
+            assertType('Itera\\Map<string, int>', $map);
+        }
+
+        self::assertTrue($matched);
     }
 
     private static function stringify(int $value): string

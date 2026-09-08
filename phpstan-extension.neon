@@ -4,6 +4,10 @@ services:
         tags:
             - phpstan.parser.richParserNodeVisitor
     -
+        class: Itera\PHPStan\PipeAggregatorContextVisitor
+        tags:
+            - phpstan.parser.richParserNodeVisitor
+    -
         class: Itera\PHPStan\AggregatorCallbackTypeExtension
         tags:
             - phpstan.functionParameterClosureTypeExtension
@@ -19,3 +23,7 @@ services:
         class: Itera\PHPStan\SequenceAggregateReturnTypeExtension
         tags:
             - phpstan.broker.dynamicMethodReturnTypeExtension
+    -
+        class: Itera\PHPStan\PipeFunctionReturnTypeExtension
+        tags:
+            - phpstan.broker.dynamicFunctionReturnTypeExtension

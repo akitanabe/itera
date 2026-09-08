@@ -22,6 +22,7 @@ final class AggregatorCallbackTypeExtension implements FunctionParameterClosureT
         'Itera\\Aggregator\\all' => true,
         'Itera\\Aggregator\\any' => true,
         'Itera\\Aggregator\\associate' => true,
+        'Itera\\Pipe\\associate' => true,
     ];
 
     public function isFunctionSupported(FunctionReflection $functionReflection, ParameterReflection $parameter): bool
@@ -40,7 +41,7 @@ final class AggregatorCallbackTypeExtension implements FunctionParameterClosureT
             return null;
         }
 
-        $returnType = $functionReflection->getName() === 'Itera\\Aggregator\\associate'
+        $returnType = str_ends_with($functionReflection->getName(), '\\associate')
             ? TypeCombinator::union(new IntegerType(), new StringType())
             : new BooleanType();
 

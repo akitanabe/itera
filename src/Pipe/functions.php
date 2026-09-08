@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Itera\Pipe;
 
 use Closure;
+use Itera\Aggregator;
 use Itera\Collection;
+use Itera\Map;
 use Itera\Sequence;
 use Traversable;
 
@@ -105,6 +107,40 @@ function collect(): Closure
             return $sequence->collect();
         }
     };
+
+    return $adapter(...);
+}
+
+/**
+ * Returns a reusable Closure without executing the aggregation.
+ * Applying it consumes the Sequence through Sequence::aggregate(), including
+ * the same consumed-input rejection and exception propagation.
+ *
+ * @template T
+ * @template R
+ * @param Aggregator<T, R> $aggregator
+ * @return Closure(Sequence<T>): R
+ */
+function aggregate(Aggregator $aggregator): Closure
+{
+    $adapter = new AggregateAdapter($aggregator);
+
+    return $adapter(...);
+}
+
+/**
+ * Returns a reusable Closure without executing the key selector.
+ * Applying it consumes the Sequence through Sequence::associate(), including
+ * the same consumed-input rejection and exception propagation.
+ *
+ * @template T
+ * @template TKey of array-key
+ * @param callable(T): TKey $keySelector
+ * @return Closure(Sequence<T>): Map<TKey, T>
+ */
+function associate(callable $keySelector): Closure
+{
+    $adapter = new AssociateAdapter($keySelector);
 
     return $adapter(...);
 }
