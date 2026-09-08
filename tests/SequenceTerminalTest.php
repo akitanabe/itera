@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Itera\Tests;
 
 use Itera\Collection;
+use Itera\Map;
 use Itera\Sequence;
 use Itera\SequenceConsumedException;
 use PHPUnit\Framework\Attributes\TestWith;
@@ -12,7 +13,7 @@ use PHPUnit\Framework\TestCase;
 
 final class SequenceTerminalTest extends TestCase
 {
-    public function testCollectIsTheOnlyMaterializationMethodAndReturnsACollection(): void
+    public function testCollectMaterializesIntoACollection(): void
     {
         self::assertContains('collect', get_class_methods(Sequence::class));
         self::assertNotContains('toArray', get_class_methods(Sequence::class));
@@ -23,6 +24,16 @@ final class SequenceTerminalTest extends TestCase
         self::assertInstanceOf(Collection::class, $materialized);
         self::assertSame(['alpha', 'beta'], $materialized->values());
         self::assertSame([], Sequence::empty()->collect()->values());
+    }
+
+    public function testAssociateIsAMaterializationMethodAndReturnsAMap(): void
+    {
+        self::assertContains('associate', get_class_methods(Sequence::class));
+        self::assertInstanceOf(Map::class, Sequence::empty()->associate(static fn(mixed $value): string => 'unused'));
+        self::assertSame(
+            ['a' => 'alpha', 'b' => 'beta'],
+            Sequence::from(['alpha', 'beta'])->associate(static fn(string $value): string => $value[0])->raw(),
+        );
     }
 
     public function testCollectReturnsACollectionAndConsumesEveryFiniteValue(): void

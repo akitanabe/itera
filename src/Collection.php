@@ -148,6 +148,22 @@ final class Collection implements IteratorAggregate, Countable
     }
 
     /**
+     * @template TKey of array-key
+     * @param callable(T): TKey $keySelector
+     * @return Map<TKey, T>
+     */
+    public function associate(callable $keySelector): Map
+    {
+        /** @var array<TKey, T> $values */
+        $values = [];
+        foreach ($this->values as $value) {
+            $values[$keySelector($value)] = $value;
+        }
+
+        return Map::from($values);
+    }
+
+    /**
      * @return list<T>
      */
     public function values(): array

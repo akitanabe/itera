@@ -110,6 +110,9 @@ final class SequenceContractTest extends TestCase
         yield 'take' => [static fn(Sequence $sequence): mixed => $sequence->take(1)];
         yield 'drop' => [static fn(Sequence $sequence): mixed => $sequence->drop(1)];
         yield 'collect' => [static fn(Sequence $sequence): mixed => $sequence->collect()];
+        yield 'associate' => [
+            static fn(Sequence $sequence): mixed => $sequence->associate(static fn(mixed $value): string => 'key'),
+        ];
         yield 'fold' => [
             static fn(Sequence $sequence): mixed => $sequence->fold(
                 null,

@@ -231,6 +231,26 @@ final class Sequence implements IteratorAggregate
     }
 
     /**
+     * Consumes every output value into a fresh Map using the selected key.
+     * Duplicate keys retain the last value encountered.
+     *
+     * @template TKey of array-key
+     * @param callable(T): TKey $keySelector
+     * @return Map<TKey, T>
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     */
+    public function associate(callable $keySelector): Map
+    {
+        /** @var array<TKey, T> $values */
+        $values = [];
+        foreach ($this->beginConsumption() as $value) {
+            $values[$keySelector($value)] = $value;
+        }
+
+        return Map::from($values);
+    }
+
+    /**
      * Consumes every output value by applying step to state then value in
      * sequence order. An empty result returns the original initial value.
      *

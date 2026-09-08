@@ -32,6 +32,10 @@ $usersById = Map::from([
 $user = $usersById->get('u1');
 ```
 
+`Map::from()` は連想配列を受け取り、`get()` と `has()` による lookup、`keys()`、`values()`、`entries()` による materialized な `Collection` 投影、`raw()` による配列取得を提供します。存在しない key と保存された `null` value に対して `get()` はどちらも `null` を返すため、区別が必要な場合は `has()` を使います。反復では元の key/value を保持します。Map に位置検索、値検索、変換、`ArrayAccess` は追加しません。
+
+`Collection::associate()` と `Sequence::associate()` は key selector だけを受け取ります。Collection はコレクションの値、Sequence は pipeline の出力値を value とする `Map` を生成します。重複 key は後から現れた値で上書きされます。`Sequence::associate()` は終端処理として source と pipeline を消費します。
+
 ### Sequence
 
 `Sequence<T>` は mutable で一度だけ消費できる遅延変換パイプラインです。`Collection` の `sequence()` または任意の `iterable` から生成できます。`map`、`filter`、`flatMap`、`until`、`skipUntil`、`take`、`drop` は同じ `Sequence` を更新し、終端処理または `foreach` が始まるまで source や callback を実行しません。
@@ -49,13 +53,13 @@ $result = Sequence::from($users)
 
 `skipUntil($predicate)` は最初に predicate が truthy と判定された値を含め、それ以降の値を下流へ送り、最初の一致より前の値を捨てます。一致後は predicate を呼び出さず、一致する値がなければ空になります。predicate は値だけを受け取ります。
 
-終端処理は `collect()`、`fold()`、`getIterator()` です。`collect()` は値を新しい `Collection` に materialize し、空の結果でも新しい `Collection` を返します。`foreach` でも最終出力を list key で順に取得できます。`getIterator()` は返した iterator を進める前でも、呼び出した時点で `Sequence` を使用済みにします。`fold($initial, $step)` は `step($state, $value)` を順に適用します。
+終端処理は `collect()`、`associate()`、`fold()`、`getIterator()` です。`collect()` は値を新しい `Collection` に materialize し、空の結果でも新しい `Collection` を返します。`foreach` でも最終出力を list key で順に取得できます。`getIterator()` は返した iterator を進める前でも、呼び出した時点で `Sequence` を使用済みにします。`fold($initial, $step)` は `step($state, $value)` を順に適用します。
 
 これは破壊的な API 整理です。旧 `toArray()` と `toCollection()` は削除し、配列が必要な場合は `collect()->values()` を使います。`Sequence` から `first()`、`last()`、`contains()`、`count()`、`any()`、`all()`、`reduce()` も提供しません。値の query は `Collection` に残し、`Sequence` では pipeline primitive としての変換、境界、materialization、`fold()` を使います。
 
 どの終端処理も呼び出した時点で消費を開始します。source や callback の例外はそのまま伝播し、途中終了や例外の後を含め、消費を開始した `Sequence` は再利用できません。`map()` や `flatMap()` による同一インスタンス上の型変更は静的解析できますが、変更前に保持した別名参照の型には解析上の制限があります。
 
-`collect()`、`fold()` は結果を最後まで消費するため、無限 source では終了しません。`until()` も一致する値がない無限 source では終了せず、`skipUntil()` も一致後に無限の残りがある場合は残りを全消費する終端処理では終了しません。必要に応じて先に `take()` で有限化します。
+`collect()`、`associate()`、`fold()` は結果を最後まで消費するため、無限 source では終了しません。`until()` も一致する値がない無限 source では終了せず、`skipUntil()` も一致後に無限の残りがある場合は残りを全消費する終端処理では終了しません。必要に応じて先に `take()` で有限化します。
 
 ### Pipe facade
 
