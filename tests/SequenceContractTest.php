@@ -60,7 +60,7 @@ final class SequenceContractTest extends TestCase
         }
 
         $this->expectException(SequenceConsumedException::class);
-        $sequence->first();
+        $sequence->toArray();
     }
 
     public function testCallbackIsReleasedAfterConsumptionCompletes(): void
@@ -111,10 +111,6 @@ final class SequenceContractTest extends TestCase
         yield 'drop' => [static fn(Sequence $sequence): mixed => $sequence->drop(1)];
         yield 'toArray' => [static fn(Sequence $sequence): mixed => $sequence->toArray()];
         yield 'toCollection' => [static fn(Sequence $sequence): mixed => $sequence->toCollection()];
-        yield 'first' => [static fn(Sequence $sequence): mixed => $sequence->first()];
-        yield 'count' => [static fn(Sequence $sequence): mixed => $sequence->count()];
-        yield 'any' => [static fn(Sequence $sequence): mixed => $sequence->any(static fn(mixed $value): bool => true)];
-        yield 'all' => [static fn(Sequence $sequence): mixed => $sequence->all(static fn(mixed $value): bool => true)];
         yield 'fold' => [
             static fn(Sequence $sequence): mixed => $sequence->fold(
                 null,
@@ -157,10 +153,8 @@ final class SequenceContractTest extends TestCase
         ];
     }
 
-    public function testTerminalCallbacksAreRequiredAndSequenceIsNotCountable(): void
+    public function testFoldRequiresStateAndCallbackAndSequenceIsNotCountable(): void
     {
-        self::assertSame(1, new ReflectionMethod(Sequence::class, 'any')->getNumberOfRequiredParameters());
-        self::assertSame(1, new ReflectionMethod(Sequence::class, 'all')->getNumberOfRequiredParameters());
         self::assertSame(2, new ReflectionMethod(Sequence::class, 'fold')->getNumberOfRequiredParameters());
         self::assertNotContains(Countable::class, class_implements(Sequence::class));
     }

@@ -45,15 +45,17 @@ $result = Sequence::from($users)
     ->toCollection();
 ```
 
-`until($predicate)` は最初に predicate が `true` を返した値までを含めて下流へ送り、その後の upstream の読み取りを停止します。一致する値がなければ最後まで値を送り、predicate は値だけを受け取り実際の `bool` を返す必要があります。
+`map()` と `filter()` の callback は値だけを受け取ります。`filter()` の predicate は実際の `bool` を返す必要があります。`until($predicate)` は最初に predicate が `true` を返した値までを含めて下流へ送り、その後の upstream の読み取りを停止します。一致する値がなければ最後まで値を送り、predicate は値だけを受け取り実際の `bool` を返す必要があります。
 
 `skipUntil($predicate)` は最初に predicate が `true` を返した値を含め、それ以降の値を下流へ送り、最初の一致より前の値を捨てます。一致後は predicate を呼び出さず、一致する値がなければ空になります。両方の predicate は値だけを受け取り、実際の `bool` を返す必要があります。
 
-終端処理は `toArray()`、`toCollection()`、`first()`、`count()`、`any()`、`all()`、`fold()`、`getIterator()` です。`foreach` でも最終出力を list key で順に取得できます。`getIterator()` は返した iterator を進める前でも、呼び出した時点で `Sequence` を使用済みにします。`first()`、`any()`、`all()` は結果が確定すると source の読み取りを停止し、`any()` と `all()` の predicate も実際の `bool` を返す必要があります。`fold($initial, $step)` は `step($state, $value)` を順に適用します。
+終端処理は `toArray()`、`toCollection()`、`fold()`、`getIterator()` です。`foreach` でも最終出力を list key で順に取得できます。`getIterator()` は返した iterator を進める前でも、呼び出した時点で `Sequence` を使用済みにします。`fold($initial, $step)` は `step($state, $value)` を順に適用します。
+
+これは破壊的な API 整理です。`Sequence` から `first()`、`last()`、`contains()`、`count()`、`any()`、`all()`、`reduce()` を提供しません。値の query は `Collection` に残し、`Sequence` では pipeline primitive としての変換、境界、materialization、`fold()` を使います。
 
 どの終端処理も呼び出した時点で消費を開始します。source や callback の例外はそのまま伝播し、途中終了や例外の後を含め、消費を開始した `Sequence` は再利用できません。`map()` や `flatMap()` による同一インスタンス上の型変更は静的解析できますが、変更前に保持した別名参照の型には解析上の制限があります。
 
-`toArray()`、`toCollection()`、`count()`、`fold()` は結果を最後まで消費するため、無限 source では終了しません。`until()` も一致する値がない無限 source では終了せず、`skipUntil()` も一致後に無限の残りがある場合は残りを全消費する終端処理では終了しません。必要に応じて先に `take()` で有限化します。
+`toArray()`、`toCollection()`、`fold()` は結果を最後まで消費するため、無限 source では終了しません。`until()` も一致する値がない無限 source では終了せず、`skipUntil()` も一致後に無限の残りがある場合は残りを全消費する終端処理では終了しません。必要に応じて先に `take()` で有限化します。
 
 ### 採用範囲
 

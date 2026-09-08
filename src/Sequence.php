@@ -21,7 +21,6 @@ use TypeError;
  * reused after early termination or an exception. Source and callback
  * exceptions are propagated unchanged.
  *
- * @mago-expect lint:kan-defect
  * @mago-expect lint:too-many-methods
  *
  * @template T
@@ -252,79 +251,6 @@ final class Sequence implements IteratorAggregate
     }
 
     /**
-     * Consumes up to the first output value and returns null when no value is
-     * available. A stored null and an empty result both return null.
-     *
-     * @return T|null
-     * @throws SequenceConsumedException If this sequence was already consumed.
-     */
-    public function first(): mixed
-    {
-        $values = $this->beginConsumption();
-        if (!$values->valid()) {
-            return null;
-        }
-
-        return $values->current();
-    }
-
-    /**
-     * Consumes every output value and returns the number produced by the
-     * pipeline. This operation finishes only when the result is finite.
-     *
-     * @throws SequenceConsumedException If this sequence was already consumed.
-     */
-    public function count(): int
-    {
-        $count = 0;
-        foreach ($this->beginConsumption() as $_value) {
-            ++$count;
-        }
-
-        return $count;
-    }
-
-    /**
-     * Consumes values until the predicate returns actual bool true. The
-     * predicate receives each value as its only argument; an empty result is
-     * false.
-     *
-     * @param callable(T): bool $predicate
-     * @throws SequenceConsumedException If this sequence was already consumed.
-     * @throws TypeError If the predicate returns a non-boolean value.
-     */
-    public function any(callable $predicate): bool
-    {
-        foreach ($this->beginConsumption() as $value) {
-            if ($this->requireBoolean($predicate($value), 'any')) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Consumes values until the predicate returns actual bool false. The
-     * predicate receives each value as its only argument; an empty result is
-     * true.
-     *
-     * @param callable(T): bool $predicate
-     * @throws SequenceConsumedException If this sequence was already consumed.
-     * @throws TypeError If the predicate returns a non-boolean value.
-     */
-    public function all(callable $predicate): bool
-    {
-        foreach ($this->beginConsumption() as $value) {
-            if (!$this->requireBoolean($predicate($value), 'all')) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
      * Consumes every output value by applying step to state then value in
      * sequence order. An empty result returns the original initial value.
      *
@@ -392,14 +318,5 @@ final class Sequence implements IteratorAggregate
         if ($count < 0) {
             throw new InvalidArgumentException('Count must be non-negative.');
         }
-    }
-
-    private function requireBoolean(mixed $result, string $operation): bool
-    {
-        if (!is_bool($result)) {
-            throw new TypeError('Sequence ' . $operation . ' predicate must return bool.');
-        }
-
-        return $result;
     }
 }
