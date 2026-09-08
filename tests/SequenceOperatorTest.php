@@ -8,7 +8,6 @@ use InvalidArgumentException;
 use Itera\Sequence;
 use Itera\SequenceConsumedException;
 use PHPUnit\Framework\TestCase;
-use ReflectionMethod;
 use TypeError;
 
 /** @mago-expect lint:too-many-methods */
@@ -297,8 +296,8 @@ final class SequenceOperatorTest extends TestCase
     public function testFlatMapRejectsANonIterableResultAndConsumesTheSequence(): void
     {
         $sequence = Sequence::of(1);
-        $flatMap = new ReflectionMethod($sequence, 'flatMap');
-        $flatMap->invoke($sequence, static fn(mixed $value): int => is_int($value) ? $value : 0);
+        // @phpstan-ignore argument.type, argument.templateType (A non-iterable result intentionally exercises runtime rejection.)
+        $sequence->flatMap(static fn(mixed $value): int => is_int($value) ? $value : 0);
 
         try {
             iterator_to_array($sequence);
