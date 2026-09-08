@@ -12,12 +12,11 @@ PHP で値・対応関係・遅延計算を分離して扱うための、軽量�
 
 ### Collection
 
-`Collection<T>` は integer index を持つ順序付きコレクションです。`map` や `filter` はその場で評価され、`Collection` として結果を返します。
+`Collection<T>` は再利用可能な、順序付きの materialized value collection です。`contains()`、`find()`、`indexOf()`、`findIndex()`、`any()`、`all()` による query と、`reverse()`、`slice()` による保持済み順序への操作を提供します。値の変換や遅延処理は `sequence()` から `Sequence<T>` に移します。
 
 ```php
-$names = Collection::of($user1, $user2, $user3)
-    ->map(fn (User $user) => $user->name())
-    ->filter(fn (string $name) => $name !== '');
+$users = Collection::of($user1, $user2, $user3);
+$firstActiveUser = $users->find(fn (User $user): bool => $user->isActive());
 ```
 
 ### Map

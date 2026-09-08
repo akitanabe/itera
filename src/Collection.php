@@ -97,6 +97,73 @@ final class Collection implements IteratorAggregate, Countable
     }
 
     /**
+     * @param T $value
+     */
+    public function contains(mixed $value): bool
+    {
+        return in_array($value, $this->values, strict: true);
+    }
+
+    /**
+     * @param callable(T, int<0, max>): bool $predicate
+     * @return T|null
+     */
+    public function find(callable $predicate): mixed
+    {
+        return array_find($this->values, $predicate);
+    }
+
+    /**
+     * @param T $value
+     */
+    public function indexOf(mixed $value): ?int
+    {
+        $index = array_search($value, $this->values, strict: true);
+
+        return $index === false ? null : $index;
+    }
+
+    /**
+     * @param callable(T, int<0, max>): bool $predicate
+     */
+    public function findIndex(callable $predicate): ?int
+    {
+        return array_find_key($this->values, $predicate);
+    }
+
+    /**
+     * @param callable(T, int<0, max>): bool $predicate
+     */
+    public function any(callable $predicate): bool
+    {
+        return array_any($this->values, $predicate);
+    }
+
+    /**
+     * @param callable(T, int<0, max>): bool $predicate
+     */
+    public function all(callable $predicate): bool
+    {
+        return array_all($this->values, $predicate);
+    }
+
+    /**
+     * @return self<T>
+     */
+    public function reverse(): self
+    {
+        return new self(array_reverse($this->values));
+    }
+
+    /**
+     * @return self<T>
+     */
+    public function slice(int $offset, ?int $length = null): self
+    {
+        return new self(array_slice($this->values, $offset, $length));
+    }
+
+    /**
      * @return list<T>
      */
     public function toArray(): array
