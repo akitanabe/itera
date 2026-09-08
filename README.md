@@ -63,7 +63,7 @@ $result = Sequence::from($users)
 
 ### Aggregator
 
-`Aggregator<T, R>` は `Sequence<T>` の出力を `R` に集約する、再利用可能な定義です。`Itera\Aggregator` 名前空間には `count()`、`any($predicate)`、`all($predicate)`、`collect()`、`associate($keySelector)` があります。定義を作った時点では source、predicate、key selector を実行せず、`Sequence::aggregate()` に渡した時点でその Sequence を消費します。同じ定義を別の Sequence に再利用でき、実行ごとの状態や materialized な結果は共有されません。
+`Aggregator<T, R>` は `Sequence<T>` の出力を `R` に集約する、再利用可能な定義です。`Itera\Aggregator` 名前空間には `count()`、`any($predicate)`、`all($predicate)`、`collect()`、`associate($keySelector)`、`combine(...$aggregators)` があります。定義を作った時点では source、predicate、key selector を実行せず、`Sequence::aggregate()` に渡した時点でその Sequence を消費します。同じ定義を別の Sequence に再利用でき、実行ごとの状態や materialized な結果は共有されません。
 
 `count()` は空で `0`、`any()` は空で `false`、`all()` は空で `true` を返します。`any()` は最初の truthy、`all()` は最初の falsy で読み取りを止めます。`collect()` は毎回新しい `Collection` を作り、`associate()` は毎回新しい `Map` を作ります。`associate()` の重複 key は後勝ちです。`count()`、`collect()`、`associate()` は有限な出力を必要とします。
 
@@ -72,6 +72,7 @@ use function Itera\Aggregator\{
     any,
     associate as associateWith,
     collect as collectWith,
+    combine,
     count as countWith,
 };
 
@@ -80,9 +81,19 @@ $hasActiveUser = $users->sequence()->aggregate(any(fn (User $user): bool => $use
 $usersById = $users->sequence()->aggregate(associateWith(fn (User $user): int => $user->id));
 $userCount = $users->sequence()->aggregate(countWith());
 $arrayCount = count($sourceArray);
+
+$summary = $users->sequence()->aggregate(combine(
+    count: countWith(),
+    active: any(fn (User $user): bool => $user->isActive()),
+    items: collectWith(),
+    byId: associateWith(fn (User $user): int => $user->id),
+));
+// array{count: int, active: bool, items: Collection<User>, byId: Map<int, User>}
 ```
 
-`fold($initial, $step)` は呼び出しごとに初期値を渡す単純な左 fold で、Aggregator の定義ではありません。集約の合成と利用者定義の Aggregator は現在の採用範囲に含みません。
+`combine()` は一個以上の名前付き Aggregator を受け取る Aggregator 定義を返します。各子 Aggregator は対象 `Sequence` の要素型を受け取れる必要があり、合成後の入力型には子が共有する制約が残ります。静的解析では PHPStan 拡張が、`combine()` の広い PHPDoc 入力・結果型を、子ごとの callback 入力契約と名前付き結果型へ具体化します。`aggregate()` で実行すると、子の名前と指定順を保つ結果配列を返します。位置引数と `combine()` の入れ子は受け付けません。入力は一度だけ走査され、各値は未完了の子へ指定順に渡されます。完了した子の callback は以後呼ばれず、すべての子が完了すれば source の読み取りも止まります。`count()`、`collect()`、`associate()` のように全件を読む子を含む場合、合成全体も source の終端まで読みます。
+
+`fold($initial, $step)` は呼び出しごとに初期値を渡す単純な左 fold で、Aggregator の定義ではありません。利用者定義の Aggregator は現在の採用範囲に含みません。
 
 ### Pipe facade
 

@@ -6,6 +6,9 @@ namespace Itera;
 
 use Closure;
 use Itera\Internal\AggregatorBuiltIns;
+use Itera\Internal\AggregatorCombinedExecution;
+use Itera\Internal\AggregatorExecution;
+use Itera\Internal\AggregatorRunner;
 
 /**
  * A reusable built-in aggregation definition.
@@ -15,9 +18,10 @@ use Itera\Internal\AggregatorBuiltIns;
  */
 final class Aggregator
 {
-    /** @param Closure(iterable<T>): R $execute */
+    /** @param Closure(): AggregatorExecution<T, R> $executionFactory */
     private function __construct(
-        private readonly Closure $execute,
+        private readonly Closure $executionFactory,
+        private readonly bool $combined = false,
     ) {}
 
     /**
@@ -74,11 +78,41 @@ final class Aggregator
 
     /**
      * @internal
+     * @param array<array-key, self<never, mixed>> $aggregators
+     * @return self<never, array<string, mixed>>
+     */
+    public static function combineBuiltIn(array $aggregators): self
+    {
+        if ($aggregators === []) {
+            throw new \InvalidArgumentException('combine() requires at least one named Aggregator.');
+        }
+
+        foreach ($aggregators as $name => $aggregator) {
+            if (!is_string($name)) {
+                throw new \InvalidArgumentException('combine() accepts named Aggregators only.');
+            }
+            if ($aggregator->combined) {
+                throw new \InvalidArgumentException('combine() cannot contain another combined Aggregator.');
+            }
+        }
+
+        return new self(static function () use ($aggregators): AggregatorExecution {
+            $factories = [];
+            foreach ($aggregators as $name => $aggregator) {
+                $factories[$name] = $aggregator->executionFactory;
+            }
+
+            return AggregatorCombinedExecution::create($factories);
+        }, true);
+    }
+
+    /**
+     * @internal
      * @param iterable<T> $values
      * @return R
      */
     public function execute(iterable $values): mixed
     {
-        return ($this->execute)($values);
+        return AggregatorRunner::execute($values, ($this->executionFactory)());
     }
 }

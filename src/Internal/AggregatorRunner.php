@@ -4,38 +4,25 @@ declare(strict_types=1);
 
 namespace Itera\Internal;
 
-use Closure;
-
 /** @internal */
 final class AggregatorRunner
 {
     /**
      * @template T
-     * @template TState
      * @template TResult
      * @param iterable<T> $values
-     * @param Closure(): TState $initial
-     * @param Closure(TState, T): TState $step
-     * @param Closure(TState): bool $complete
-     * @param Closure(TState): TResult $finish
+     * @param AggregatorExecution<T, TResult> $execution
      * @return TResult
      */
-    public static function execute(
-        iterable $values,
-        Closure $initial,
-        Closure $step,
-        Closure $complete,
-        Closure $finish,
-    ): mixed {
-        $state = $initial();
-
+    public static function execute(iterable $values, AggregatorExecution $execution): mixed
+    {
         foreach ($values as $value) {
-            $state = $step($state, $value);
-            if ($complete($state)) {
+            $execution->advance($value);
+            if ($execution->isComplete()) {
                 break;
             }
         }
 
-        return $finish($state);
+        return $execution->finish();
     }
 }

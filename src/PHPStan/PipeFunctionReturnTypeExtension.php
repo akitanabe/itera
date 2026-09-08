@@ -57,6 +57,20 @@ final class PipeFunctionReturnTypeExtension implements DynamicFunctionReturnType
         }
 
         $definitionType = $scope->getType($definition);
+        if ($definitionType instanceof CombinedAggregatorType) {
+            $definitionInputType = AggregatorTypeResolver::inputType($definitionType->getChildrenType());
+            if ($inputType === null) {
+                return self::polymorphicCombinedClosure($definitionType, $definitionInputType);
+            }
+            if (!$definitionInputType->isSuperTypeOf($inputType)->yes()) {
+                return null;
+            }
+
+            return self::closure($inputType, AggregatorTypeResolver::resultType(
+                $definitionType->getChildrenType(),
+                $inputType,
+            ));
+        }
         if ($definitionType instanceof CollectAggregatorType) {
             return (
                 $inputType === null
@@ -102,6 +116,27 @@ final class PipeFunctionReturnTypeExtension implements DynamicFunctionReturnType
         return new ClosureType(
             [new AggregatorClosureParameter(new GenericObjectType(Sequence::class, [$template]))],
             new GenericObjectType(Collection::class, [$template]),
+            false,
+            new TemplateTypeMap(['T' => $template]),
+        );
+    }
+
+    private static function polymorphicCombinedClosure(
+        CombinedAggregatorType $aggregatorType,
+        Type $inputBound,
+    ): ClosureType {
+        // @phpstan-ignore phpstanApi.method (Saved polymorphic pipe closures require a template type; this is verified against the documented supported PHPStan version.)
+        $template = TemplateTypeFactory::create(
+            // @phpstan-ignore phpstanApi.method (The public extension API has no template-scope factory; compatibility is verified against the documented supported PHPStan version.)
+            TemplateTypeScope::createWithFunction('Itera\\Pipe\\aggregate'),
+            'T',
+            $inputBound,
+            TemplateTypeVariance::createInvariant(),
+        );
+
+        return new ClosureType(
+            [new AggregatorClosureParameter(new GenericObjectType(Sequence::class, [$template]))],
+            AggregatorTypeResolver::resultType($aggregatorType->getChildrenType(), $template),
             false,
             new TemplateTypeMap(['T' => $template]),
         );

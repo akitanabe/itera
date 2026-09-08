@@ -12,6 +12,27 @@ use PhpParser\NodeVisitorAbstract;
 
 final class PipeAggregatorContextVisitor extends NodeVisitorAbstract
 {
+    private readonly ImportedFunctionResolver $functions;
+
+    public function __construct()
+    {
+        $this->functions = new ImportedFunctionResolver();
+    }
+
+    public function beforeTraverse(array $nodes): ?array
+    {
+        $this->functions->reset();
+
+        return null;
+    }
+
+    public function enterNode(Node $node): ?Node
+    {
+        $this->functions->observe($node);
+
+        return null;
+    }
+
     public function leaveNode(Node $node): ?Node
     {
         if (!$node instanceof FuncCall || !array_key_exists('originalPipeAttrs', $node->getAttributes())) {
@@ -36,7 +57,7 @@ final class PipeAggregatorContextVisitor extends NodeVisitorAbstract
         $pipeFunction->setAttribute(AggregatorContextVisitor::RECEIVER_ATTRIBUTE, $receiver);
         $definition = $pipeFunction->getArgs()[0]->value ?? null;
         if ($pipeFactory === 'Itera\\Pipe\\aggregate' && $definition instanceof FuncCall) {
-            $definition->setAttribute(AggregatorContextVisitor::RECEIVER_ATTRIBUTE, $receiver);
+            AggregatorContextVisitor::applyReceiver($definition, $receiver, $this->functions);
         }
 
         return null;

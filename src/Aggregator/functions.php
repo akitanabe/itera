@@ -71,3 +71,16 @@ function associate(callable $keySelector): Aggregator
 {
     return Aggregator::associateBuiltIn($keySelector);
 }
+
+/**
+ * Defines one flat aggregation from named child definitions.
+ * Every child must accept the input element type of the Sequence being aggregated;
+ * the combined definition retains the common input constraints of its children.
+ *
+ * @param Aggregator<never, mixed> ...$aggregators
+ * @return Aggregator<mixed, array<string, mixed>>
+ */
+function combine(Aggregator ...$aggregators): Aggregator
+{
+    return Aggregator::combineBuiltIn($aggregators);
+}

@@ -31,11 +31,18 @@ final class SequenceAggregateReturnTypeExtension implements DynamicMethodReturnT
         Scope $scope,
     ): ?Type {
         $argument = $methodCall->getArgs()[0] ?? null;
-        if ($argument === null || !$scope->getType($argument->value) instanceof CollectAggregatorType) {
+        if ($argument === null) {
             return null;
         }
 
         $elementType = $scope->getType($methodCall->var)->getTemplateType(Sequence::class, 'T');
+        $aggregatorType = $scope->getType($argument->value);
+        if ($aggregatorType instanceof CombinedAggregatorType) {
+            return AggregatorTypeResolver::resultType($aggregatorType->getChildrenType(), $elementType);
+        }
+        if (!$aggregatorType instanceof CollectAggregatorType) {
+            return null;
+        }
 
         return new GenericObjectType(Collection::class, [$elementType]);
     }

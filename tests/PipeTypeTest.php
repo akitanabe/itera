@@ -11,6 +11,7 @@ use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use function Itera\Aggregator\any as anyWith;
 use function Itera\Aggregator\associate as associateWith;
 use function Itera\Aggregator\collect as collectWith;
+use function Itera\Aggregator\combine as combineWith;
 use function Itera\Aggregator\count as countWith;
 use function Itera\Pipe\aggregate;
 use function Itera\Pipe\associate;
@@ -27,6 +28,7 @@ use function Itera\Pipe\take;
 use function Itera\Pipe\until;
 use function PHPStan\Testing\assertType;
 
+/** @mago-expect lint:too-many-methods */
 final class PipeTypeTest extends TypeInferenceTestCase
 {
     /** @return list<string> */
@@ -177,6 +179,62 @@ final class PipeTypeTest extends TypeInferenceTestCase
         }
 
         self::assertTrue($matched);
+    }
+
+    public function testCombinedAggregationKeepsItsShapeThroughDirectAndSavedPipeClosures(): void
+    {
+        $definition = combineWith(
+            count: countWith(),
+            items: collectWith(),
+            positive: anyWith(static fn(int $value): bool => $value > 0),
+        );
+        $saved = aggregate($definition);
+        $direct = Sequence::from([1]) |> aggregate($definition);
+        $savedResult = Sequence::from([2]) |> $saved;
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('array{count: int, items: Itera\\Collection<int>, positive: bool}', $direct);
+            assertType('array{count: int, items: Itera\\Collection<int>, positive: bool}', $savedResult);
+        }
+
+        self::assertSame(1, $direct['count']);
+        self::assertSame([2], $savedResult['items']->values());
+    }
+
+    public function testSavedCombinedCollectClosureSpecializesForEachPipeInput(): void
+    {
+        $saved = aggregate(combineWith(count: countWith(), items: collectWith()));
+        $integers = Sequence::from([1]) |> $saved;
+        $strings = Sequence::from(['value']) |> $saved;
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('array{count: int, items: Itera\\Collection<int>}', $integers);
+            assertType('array{count: int, items: Itera\\Collection<string>}', $strings);
+        }
+
+        self::assertSame([1], $integers['items']->values());
+        self::assertSame(['value'], $strings['items']->values());
+    }
+
+    public function testInlineCombinedPipeInfersChildCallbackInputAndResultShape(): void
+    {
+        $user = new PipeTypeUser(1, true);
+        $result = Sequence::from([$user])
+            |> aggregate(combineWith(
+                count: countWith(),
+                active: anyWith(static fn($value) => $value->active),
+                items: collectWith(),
+                byId: associateWith(static fn($value) => $value->id),
+            ));
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType(
+                'array{count: int, active: bool, items: Itera\\Collection<Itera\\Tests\\PipeTypeUser>, byId: Itera\\Map<int, Itera\\Tests\\PipeTypeUser>}',
+                $result,
+            );
+        }
+
+        self::assertTrue($result['active']);
     }
 
     private static function stringify(int $value): string
