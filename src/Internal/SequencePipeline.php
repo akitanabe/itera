@@ -86,7 +86,7 @@ final class SequencePipeline
                         break;
                     }
 
-                    if ($step->kind === SequenceStep::LAST) {
+                    if ($step->kind === SequenceStep::STOP_UPSTREAM) {
                         $stoppedThrough = max($stoppedThrough ?? $operationIndex, $operationIndex);
                         $value = $step->value;
                         continue;

@@ -10,7 +10,7 @@ final class SequenceStep
     public const string FORWARD = 'forward';
     public const string SKIP = 'skip';
     public const string EXPAND = 'expand';
-    public const string LAST = 'last';
+    public const string STOP_UPSTREAM = 'stop_upstream';
 
     private function __construct(
         public readonly string $kind,
@@ -33,8 +33,8 @@ final class SequenceStep
         return new self(self::EXPAND, $values);
     }
 
-    public static function last(mixed $value): self
+    public static function stopUpstream(mixed $value): self
     {
-        return new self(self::LAST, $value);
+        return new self(self::STOP_UPSTREAM, $value);
     }
 }

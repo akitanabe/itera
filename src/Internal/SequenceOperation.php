@@ -46,7 +46,7 @@ final class SequenceOperation
     public static function take(int $count): Closure
     {
         return static fn(mixed $value, int $position): SequenceStep => $position === $count
-            ? SequenceStep::last($value)
+            ? SequenceStep::stopUpstream($value)
             : SequenceStep::forward($value);
     }
 
