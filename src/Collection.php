@@ -166,7 +166,7 @@ final class Collection implements IteratorAggregate, Countable
     /**
      * @return list<T>
      */
-    public function toArray(): array
+    public function values(): array
     {
         return $this->values;
     }

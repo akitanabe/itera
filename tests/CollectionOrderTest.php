@@ -15,8 +15,8 @@ final class CollectionOrderTest extends TestCase
 
         $reversed = $original->reverse();
 
-        self::assertSame(['gamma', 'beta', 'alpha'], $reversed->toArray());
-        self::assertSame(['alpha', 'beta', 'gamma'], $original->toArray());
+        self::assertSame(['gamma', 'beta', 'alpha'], $reversed->values());
+        self::assertSame(['alpha', 'beta', 'gamma'], $original->values());
     }
 
     public function testSliceSupportsNegativeOffsetsAndLengthsWithoutChangingTheOriginal(): void
@@ -27,9 +27,9 @@ final class CollectionOrderTest extends TestCase
         $withNegativeLength = $original->slice(1, -1);
         $toEnd = $original->slice(2);
 
-        self::assertSame(['b', 'c'], $fromNegativeOffset->toArray());
-        self::assertSame(['b', 'c'], $withNegativeLength->toArray());
-        self::assertSame(['c', 'd'], $toEnd->toArray());
-        self::assertSame(['a', 'b', 'c', 'd'], $original->toArray());
+        self::assertSame(['b', 'c'], $fromNegativeOffset->values());
+        self::assertSame(['b', 'c'], $withNegativeLength->values());
+        self::assertSame(['c', 'd'], $toEnd->values());
+        self::assertSame(['a', 'b', 'c', 'd'], $original->values());
     }
 }

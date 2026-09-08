@@ -22,9 +22,9 @@ final class SequenceContractTest extends TestCase
         $emptyMaterialized = Sequence::from($emptyOriginal)->toCollection();
 
         self::assertNotSame($original, $materialized);
-        self::assertSame($original->toArray(), $materialized->toArray());
+        self::assertSame($original->values(), $materialized->values());
         self::assertNotSame($emptyOriginal, $emptyMaterialized);
-        self::assertSame([], $emptyMaterialized->toArray());
+        self::assertSame([], $emptyMaterialized->values());
     }
 
     public function testBothCollectionSequenceEntrypointsHaveTheSameMeaning(): void

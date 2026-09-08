@@ -14,20 +14,20 @@ final class CollectionFactoryTest extends TestCase
     {
         $collection = Collection::of('first', 'second');
 
-        self::assertSame(['first', 'second'], $collection->toArray());
+        self::assertSame(['first', 'second'], $collection->values());
     }
 
     public function testEmptyCreatesAnEmptyCollection(): void
     {
         $collection = Collection::empty();
 
-        self::assertSame([], $collection->toArray());
+        self::assertSame([], $collection->values());
         self::assertTrue($collection->isEmpty());
     }
 
     public function testOfWithoutValuesCreatesAnEmptyCollection(): void
     {
-        self::assertSame([], Collection::of()->toArray());
+        self::assertSame([], Collection::of()->values());
     }
 
     public function testFromMaterializesValuesAndDiscardsInputKeys(): void
@@ -37,7 +37,7 @@ final class CollectionFactoryTest extends TestCase
             7 => 'beta',
         ]);
 
-        self::assertSame(['alpha', 'beta'], $collection->toArray());
+        self::assertSame(['alpha', 'beta'], $collection->values());
         self::assertSame([0 => 'alpha', 1 => 'beta'], iterator_to_array($collection));
     }
 
@@ -56,7 +56,7 @@ final class CollectionFactoryTest extends TestCase
         $collection = Collection::from($source);
 
         self::assertTrue($finished);
-        self::assertSame(['first', 'second'], $collection->toArray());
+        self::assertSame(['first', 'second'], $collection->values());
         self::assertSame(['first', 'second'], iterator_to_array($collection));
     }
 

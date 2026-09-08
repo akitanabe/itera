@@ -33,7 +33,7 @@ final class CollectionReadTest extends TestCase
 
         self::assertNull($collection->at(0));
         self::assertNull($collection->last());
-        self::assertSame([null, 'value', null], $collection->toArray());
+        self::assertSame([null, 'value', null], $collection->values());
     }
 
     public function testFirstAndLastReturnNullForAnEmptyCollection(): void
@@ -55,12 +55,12 @@ final class CollectionReadTest extends TestCase
     public function testChangingTheReturnedArrayDoesNotChangeTheCollection(): void
     {
         $collection = Collection::of('original');
-        $values = $collection->toArray();
+        $values = $collection->values();
         $values[0] = 'changed';
         $values[] = 'added';
 
         self::assertSame(['changed', 'added'], $values);
-        self::assertSame(['original'], $collection->toArray());
+        self::assertSame(['original'], $collection->values());
     }
 
     public function testCountAndIsEmptyDescribeMaterializedValues(): void
