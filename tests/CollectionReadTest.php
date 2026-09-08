@@ -44,6 +44,25 @@ final class CollectionReadTest extends TestCase
         self::assertSame(null, $collection->last());
     }
 
+    public function testFirstAndLastReturnTheBoundaryValues(): void
+    {
+        $collection = Collection::of('first', 'middle', 'last');
+
+        self::assertSame('first', $collection->first());
+        self::assertSame('last', $collection->last());
+    }
+
+    public function testChangingTheReturnedArrayDoesNotChangeTheCollection(): void
+    {
+        $collection = Collection::of('original');
+        $values = $collection->toArray();
+        $values[0] = 'changed';
+        $values[] = 'added';
+
+        self::assertSame(['changed', 'added'], $values);
+        self::assertSame(['original'], $collection->toArray());
+    }
+
     public function testCountAndIsEmptyDescribeMaterializedValues(): void
     {
         $collection = Collection::of('first', 'second');

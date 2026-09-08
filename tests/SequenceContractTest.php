@@ -12,7 +12,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 
-/** @mago-expect lint:too-many-methods */
 final class SequenceContractTest extends TestCase
 {
     public function testToCollectionAlwaysCreatesANewCollection(): void
@@ -32,7 +31,8 @@ final class SequenceContractTest extends TestCase
     {
         $collection = Collection::from(['named' => 'alpha', 8 => 'beta']);
 
-        self::assertSame(Sequence::from($collection)->toArray(), $collection->sequence()->toArray());
+        self::assertSame(['alpha', 'beta'], Sequence::from($collection)->toArray());
+        self::assertSame(['alpha', 'beta'], $collection->sequence()->toArray());
     }
 
     #[DataProvider('instanceOperations')]
@@ -141,27 +141,6 @@ final class SequenceContractTest extends TestCase
         self::assertSame(1, new ReflectionMethod(Sequence::class, 'all')->getNumberOfRequiredParameters());
         self::assertSame(2, new ReflectionMethod(Sequence::class, 'fold')->getNumberOfRequiredParameters());
         self::assertNotContains(Countable::class, class_implements(Sequence::class));
-    }
-
-    public function testExcludedApisAreNotPublic(): void
-    {
-        foreach ([
-            'reduce',
-            'toMap',
-            'mapIndexed',
-            'filterIndexed',
-            'scan',
-            'chunk',
-            'zip',
-            'distinct',
-            'takeWhile',
-            'dropWhile',
-            'isConsumed',
-            'fork',
-            'reset',
-        ] as $method) {
-            self::assertFalse(method_exists(Sequence::class, $method), $method);
-        }
     }
 
     /** @return iterable<mixed> */

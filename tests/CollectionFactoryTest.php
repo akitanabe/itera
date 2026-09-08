@@ -25,6 +25,11 @@ final class CollectionFactoryTest extends TestCase
         self::assertTrue($collection->isEmpty());
     }
 
+    public function testOfWithoutValuesCreatesAnEmptyCollection(): void
+    {
+        self::assertSame([], Collection::of()->toArray());
+    }
+
     public function testFromMaterializesValuesAndDiscardsInputKeys(): void
     {
         $collection = Collection::from([
@@ -45,18 +50,20 @@ final class CollectionFactoryTest extends TestCase
 
     public function testFromConsumesOneShotIterablesAtCallTime(): void
     {
-        $started = false;
-        $source = $this->oneShotSource($started);
+        $finished = false;
+        $source = $this->oneShotSource($finished);
 
         $collection = Collection::from($source);
 
-        self::assertSame(true, $started);
-        self::assertSame(['value'], $collection->toArray());
+        self::assertTrue($finished);
+        self::assertSame(['first', 'second'], $collection->toArray());
+        self::assertSame(['first', 'second'], iterator_to_array($collection));
     }
 
-    private function oneShotSource(bool &$started): Generator
+    private function oneShotSource(bool &$finished): Generator
     {
-        $started = true;
-        yield 'value';
+        yield 'same-key' => 'first';
+        yield 'same-key' => 'second';
+        $finished = true;
     }
 }

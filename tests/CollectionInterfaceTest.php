@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Itera\Tests;
 
 use Itera\Collection;
-use Itera\Sequence;
 use PHPUnit\Framework\TestCase;
 
 final class CollectionInterfaceTest extends TestCase
@@ -18,8 +17,20 @@ final class CollectionInterfaceTest extends TestCase
         self::assertSame([0 => 'first', 1 => 'second'], iterator_to_array($collection));
     }
 
-    public function testSequenceIsTheExplicitLazyBoundary(): void
+    public function testSequenceTransformsValuesLazilyWithoutChangingTheCollection(): void
     {
-        self::assertInstanceOf(Sequence::class, Collection::of('value')->sequence());
+        $collection = Collection::from([1, 2]);
+        $seen = [];
+        $sequence = $collection->sequence()->map(static function (int $value) use (&$seen): int {
+            $seen[] = $value;
+
+            return $value * 10;
+        });
+
+        self::assertSame([], $seen);
+        self::assertSame([10, 20], $sequence->toArray());
+        self::assertSame([1, 2], $seen);
+        self::assertSame([1, 2], $collection->toArray());
+        self::assertSame([1, 2], $collection->sequence()->toArray());
     }
 }
