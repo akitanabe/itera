@@ -95,6 +95,19 @@ final class SequenceTypeTest extends TypeInferenceTestCase
         self::assertSame([1.0, 3.0], $sequence->collect()->values());
     }
 
+    public function testTapPreservesTheElementTypeAndReceiverType(): void
+    {
+        $sequence = Sequence::from([1, 2]);
+        $same = $sequence->tap(static function (int $value): void {});
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Sequence<int>', $sequence);
+            assertType('Itera\\Sequence<int>', $same);
+        }
+
+        self::assertSame([1, 2], $sequence->collect()->values());
+    }
+
     public function testSkipUntilPreservesTheElementType(): void
     {
         $sequence = Sequence::from([1, 2])->skipUntil(static fn(int $value): bool => $value === 2);

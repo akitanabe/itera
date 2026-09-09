@@ -44,6 +44,16 @@ function scan(mixed $initial, callable $step): Closure
 
 /**
  * @template T
+ * @param callable(T): void $effect
+ * @return Closure(Sequence<T>): Sequence<T>
+ */
+function tap(callable $effect): Closure
+{
+    return static fn(Sequence $sequence): Sequence => $sequence->tap($effect);
+}
+
+/**
+ * @template T
  * @param callable(T): bool $predicate
  * @return Closure(Sequence<T>): Sequence<T>
  */

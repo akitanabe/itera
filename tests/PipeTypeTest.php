@@ -27,6 +27,7 @@ use function Itera\Pipe\scan;
 use function Itera\Pipe\sequence;
 use function Itera\Pipe\skipUntil;
 use function Itera\Pipe\take;
+use function Itera\Pipe\tap;
 use function Itera\Pipe\until;
 use function PHPStan\Testing\assertType;
 
@@ -122,6 +123,26 @@ final class PipeTypeTest extends TypeInferenceTestCase
         self::assertSame(['1', '12'], $direct->collect()->values());
         self::assertSame([1.0, 3.0], $first->collect()->values());
         self::assertSame([3.0], $second->collect()->values());
+    }
+
+    public function testTapPreservesTheElementTypeThroughDirectAndSavedPipeClosures(): void
+    {
+        /** @var iterable<int> $values */
+        $values = [1, 2];
+        $direct = $values |> sequence() |> tap(static function (int $value): void {});
+
+        $saved = tap(static function (string $value): void {});
+        /** @var iterable<string> $strings */
+        $strings = ['a', 'b'];
+        $applied = $strings |> sequence() |> $saved;
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Sequence<int>', $direct);
+            assertType('Itera\\Sequence<string>', $applied);
+        }
+
+        self::assertSame([1, 2], $direct->collect()->values());
+        self::assertSame(['a', 'b'], $applied->collect()->values());
     }
 
     public function testSavedPolymorphicFactoriesInferEachPipeInputIndependently(): void

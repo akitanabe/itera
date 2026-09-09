@@ -128,6 +128,24 @@ final class Sequence implements IteratorAggregate
     }
 
     /**
+     * Lazily runs an effect for each value and forwards the same value.
+     *
+     * The effect return value is ignored; runtime behavior follows ordinary
+     * PHP callable invocation without enforcing a void result.
+     *
+     * @param callable(T): void $effect
+     * @return $this
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     */
+    public function tap(callable $effect): self
+    {
+        $this->assertNotConsumed();
+        $this->operations[] = SequenceOperation::tap($effect);
+
+        return $this;
+    }
+
+    /**
      * Lazily retains values for which the predicate result is truthy.
      *
      * @param callable(T): bool $predicate

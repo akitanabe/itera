@@ -38,7 +38,7 @@ $user = $usersById->get('u1');
 
 ### Sequence
 
-`Sequence<T>` は mutable で一度だけ消費できる遅延変換パイプラインです。`Collection` の `sequence()` または任意の `iterable` から生成できます。`map`、`scan`、`filter`、`flatMap`、`until`、`skipUntil`、`take`、`drop` は同じ `Sequence` を更新し、終端処理または `foreach` が始まるまで source や callback を実行しません。
+`Sequence<T>` は mutable で一度だけ消費できる遅延変換パイプラインです。`Collection` の `sequence()` または任意の `iterable` から生成できます。`map`、`scan`、`tap`、`filter`、`flatMap`、`until`、`skipUntil`、`take`、`drop` は同じ `Sequence` を更新し、終端処理または `foreach` が始まるまで source や callback を実行しません。
 
 ```php
 $result = Sequence::from($users)
@@ -59,6 +59,18 @@ $totals = Sequence::from([1, 2, 3])
 ```
 
 `scan()` は state を複製せず、object state には通常の PHP の参照共有が適用されます。入力が無限の場合は、`take()`、`until()` などで下流を停止できるようにします。
+
+`tap($effect)` は入力値ごとに `effect($value)` を一度実行し、同じ値をそのまま下流へ渡します。effect の戻り値は無視され、object の同一性と effect による変更は保持されます。effect は宣言位置まで届いた値にだけ適用されるため、`filter()` の前後で対象となる値が異なります。登録時や空入力では実行されず、無限入力では `take()`、`until()` などで下流を停止できるようにします。
+
+```php
+$result = Sequence::from([1, 2, 3])
+    ->tap(function (int $value) use ($logger): void {
+        $logger->debug((string) $value);
+    })
+    ->filter(fn (int $value): bool => $value > 1)
+    ->collect()
+    ->values(); // [2, 3]
+```
 
 `map()` と `filter()` の callback は値だけを受け取ります。`filter()`、`until()`、`skipUntil()` の predicate は静的には `bool` を返す契約ですが、実行時の判定は PHP の truthiness に従います。`until($predicate)` は最初に predicate が truthy と判定された値までを含めて下流へ送り、その後の upstream の読み取りを停止します。一致する値がなければ最後まで値を送ります。
 
@@ -169,11 +181,13 @@ $usersCollection = $users
     |> aggregate(collectWith());
 ```
 
-`sequence()`、`map($mapper)`、`scan($initial, $step)`、`filter($predicate)`、`flatMap($mapper)`、`until($predicate)`、`skipUntil($predicate)`、`take($count)`、`drop($count)`、`collect()`、`fold($initial, $step)`、`aggregate($aggregator)`、`associate($keySelector)`、`getIterator()` は、それぞれ単一の入力を受け取る `Closure` を返します。factory の作成時には source や callback を実行せず、`take()` と `drop()` の負数検証も行いません。返した Closure を `Sequence` に適用した時点で対応するメソッドを直接呼ぶため、負数の拒否や消費済み入力の拒否はその適用時に発生します。
+`sequence()`、`map($mapper)`、`scan($initial, $step)`、`tap($effect)`、`filter($predicate)`、`flatMap($mapper)`、`until($predicate)`、`skipUntil($predicate)`、`take($count)`、`drop($count)`、`collect()`、`fold($initial, $step)`、`aggregate($aggregator)`、`associate($keySelector)`、`getIterator()` は、それぞれ単一の入力を受け取る `Closure` を返します。factory の作成時には source や callback を実行せず、`take()` と `drop()` の負数検証も行いません。返した Closure を `Sequence` に適用した時点で対応するメソッドを直接呼ぶため、負数の拒否や消費済み入力の拒否はその適用時に発生します。
 
 中間操作は同じ mutable な `Sequence` を返し、source と callback の実行は終端処理まで遅延されます。`collect()`、`fold()`、`aggregate()`、`associate()` は適用時に消費し、`getIterator()` も適用した時点で Sequence を使用済みにします。各 Sequence は一度だけ消費できます。全件を読む終端処理には有限な出力が必要です。
 
 factory が返した Closure は複数の Sequence に適用できます。`take()`、`drop()`、`scan()` の scalar な進行状態は Sequence ごとに独立します。一方、factory に渡した callback、その callback が捕捉した値、`fold()` の初期オブジェクト、`scan()` の object seed は複製されず、通常の PHP の参照共有に従って同じ値が再利用されます。
+
+`tap($effect)` の factory も再利用でき、各 Sequence の宣言位置で値を観測します。effect の戻り値は変換に使われず、適用時にも Sequence の消費開始までは実行されません。
 
 ### 採用範囲
 

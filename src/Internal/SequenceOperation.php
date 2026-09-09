@@ -29,6 +29,16 @@ final class SequenceOperation
     }
 
     /** @return Closure(mixed, int): SequenceStep */
+    public static function tap(callable $effect): Closure
+    {
+        return static function (mixed $value, int $_position) use ($effect): SequenceStep {
+            $effect($value);
+
+            return SequenceStep::forward($value);
+        };
+    }
+
+    /** @return Closure(mixed, int): SequenceStep */
     public static function filter(callable $predicate): Closure
     {
         return static fn(mixed $value, int $_position): SequenceStep => $predicate($value)

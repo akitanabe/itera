@@ -28,6 +28,7 @@ use function Itera\Pipe\scan;
 use function Itera\Pipe\sequence;
 use function Itera\Pipe\skipUntil;
 use function Itera\Pipe\take;
+use function Itera\Pipe\tap;
 use function Itera\Pipe\until;
 
 /** @mago-expect lint:too-many-methods */
@@ -50,6 +51,7 @@ final class PipeTest extends TestCase
             sequence(),
             map(static fn(int $value): int => $value),
             scan(0, static fn(int $state, int $value): int => $state + $value),
+            tap(static function (int $value): void {}),
             filter(static fn(int $value): bool => $value > 0),
             flatMap(static fn(int $value): iterable => [$value]),
             until(static fn(int $value): bool => $value > 0),
@@ -156,6 +158,51 @@ final class PipeTest extends TestCase
         try {
             $sequence |> $fails |> collect();
             self::fail('The scan exception was not thrown.');
+        } catch (\RuntimeException $actual) {
+            self::assertSame($expected, $actual);
+        }
+
+        $this->assertConsumed($sequence);
+    }
+
+    public function testTapPipeDefersEffectsAndCanBeReusedAcrossSequences(): void
+    {
+        $events = [];
+        $observe = tap(static function (int $value) use (&$events): void {
+            $events[] = $value;
+        });
+        /** @var iterable<int> $firstValues */
+        $firstValues = [1, 2];
+        $firstInput = $firstValues |> sequence();
+        $first = $firstInput |> $observe;
+        /** @var iterable<int> $secondValues */
+        $secondValues = [3];
+        $second = $secondValues |> sequence() |> $observe;
+
+        self::assertSame([], $events);
+        self::assertSame($firstInput, $first);
+        self::assertSame([1, 2], ($first |> collect())->values());
+        self::assertSame([3], ($second |> collect())->values());
+        self::assertSame([1, 2, 3], $events);
+    }
+
+    public function testTapPipeRejectsConsumedInputAndPreservesCallbackExceptionIdentity(): void
+    {
+        $observe = tap(static function (int $value): void {});
+        $consumed = Sequence::from([1]);
+        $consumed->collect();
+
+        $this->expectExceptionFrom(static fn(): Sequence => $consumed |> $observe, SequenceConsumedException::class);
+
+        $expected = new \RuntimeException('tap failed');
+        $fails = tap(static function (int $value) use ($expected): void {
+            throw $expected;
+        });
+        $sequence = Sequence::from([1]);
+
+        try {
+            $sequence |> $fails |> collect();
+            self::fail('The tap exception was not thrown.');
         } catch (\RuntimeException $actual) {
             self::assertSame($expected, $actual);
         }
