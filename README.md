@@ -38,7 +38,7 @@ $user = $usersById->get('u1');
 
 ### Sequence
 
-`Sequence<T>` は mutable で一度だけ消費できる遅延変換パイプラインです。`Collection` の `sequence()` または任意の `iterable` から生成できます。`map`、`scan`、`tap`、`filter`、`flatMap`、`until`、`skipUntil`、`take`、`drop` は同じ `Sequence` を更新し、終端処理または `foreach` が始まるまで source や callback を実行しません。
+`Sequence<T>` は mutable で一度だけ消費できる遅延変換パイプラインです。`Collection` の `sequence()` または任意の `iterable` から生成できます。`map`、`scan`、`tap`、`chunk`、`filter`、`flatMap`、`until`、`skipUntil`、`take`、`drop` は同じ `Sequence` を更新し、終端処理または `foreach` が始まるまで source や callback を実行しません。
 
 ```php
 $result = Sequence::from($users)
@@ -71,6 +71,17 @@ $result = Sequence::from([1, 2, 3])
     ->collect()
     ->values(); // [2, 3]
 ```
+
+`chunk($size)` は値を順に正の `size` 個ずつ、新しい `Collection` に materialize します。正常に入力が終了した場合は非空の端数も出力し、入力の key は保持しません。登録時には値を読まず、0 以下の size は登録時に拒否します。
+
+```php
+$chunks = Sequence::from([1, 2, 3, 4, 5])
+    ->chunk(2)
+    ->collect()
+    ->values(); // Collection([1, 2]), Collection([3, 4]), Collection([5])
+```
+
+`chunk()` の各登録箇所は、chunk の形成中に現在の一塊だけを保持します。複数の `chunk()` や利用側が保持する出力を含む pipeline 全体のメモリ量を保証するものではありません。入力が無限の場合も塊ごとの出力は可能ですが、全件を読む終端処理には下流の `take()` や `until()` による停止が必要です。同一インスタンス上の型変更には、`map()` や `scan()` と同じ別名参照の静的解析上の制限があります。
 
 `map()` と `filter()` の callback は値だけを受け取ります。`filter()`、`until()`、`skipUntil()` の predicate は静的には `bool` を返す契約ですが、実行時の判定は PHP の truthiness に従います。`until($predicate)` は最初に predicate が truthy と判定された値までを含めて下流へ送り、その後の upstream の読み取りを停止します。一致する値がなければ最後まで値を送ります。
 
@@ -181,7 +192,7 @@ $usersCollection = $users
     |> aggregate(collectWith());
 ```
 
-`sequence()`、`map($mapper)`、`scan($initial, $step)`、`tap($effect)`、`filter($predicate)`、`flatMap($mapper)`、`until($predicate)`、`skipUntil($predicate)`、`take($count)`、`drop($count)`、`collect()`、`fold($initial, $step)`、`aggregate($aggregator)`、`associate($keySelector)`、`getIterator()` は、それぞれ単一の入力を受け取る `Closure` を返します。factory の作成時には source や callback を実行せず、`take()` と `drop()` の負数検証も行いません。返した Closure を `Sequence` に適用した時点で対応するメソッドを直接呼ぶため、負数の拒否や消費済み入力の拒否はその適用時に発生します。
+`sequence()`、`map($mapper)`、`scan($initial, $step)`、`tap($effect)`、`chunk($size)`、`filter($predicate)`、`flatMap($mapper)`、`until($predicate)`、`skipUntil($predicate)`、`take($count)`、`drop($count)`、`collect()`、`fold($initial, $step)`、`aggregate($aggregator)`、`associate($keySelector)`、`getIterator()` は、それぞれ単一の入力を受け取る `Closure` を返します。factory の作成時には source や callback を実行せず、`chunk()`、`take()`、`drop()` の引数検証も行いません。返した Closure を `Sequence` に適用した時点で対応するメソッドを直接呼ぶため、引数や消費済み入力の拒否はその適用時に発生します。
 
 中間操作は同じ mutable な `Sequence` を返し、source と callback の実行は終端処理まで遅延されます。`collect()`、`fold()`、`aggregate()`、`associate()` は適用時に消費し、`getIterator()` も適用した時点で Sequence を使用済みにします。各 Sequence は一度だけ消費できます。全件を読む終端処理には有限な出力が必要です。
 

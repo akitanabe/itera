@@ -16,6 +16,7 @@ use function Itera\Aggregator\combine as combineWith;
 use function Itera\Aggregator\count as countWith;
 use function Itera\Pipe\aggregate;
 use function Itera\Pipe\associate;
+use function Itera\Pipe\chunk;
 use function Itera\Pipe\collect;
 use function Itera\Pipe\drop;
 use function Itera\Pipe\filter;
@@ -143,6 +144,31 @@ final class PipeTypeTest extends TypeInferenceTestCase
 
         self::assertSame([1, 2], $direct->collect()->values());
         self::assertSame(['a', 'b'], $applied->collect()->values());
+    }
+
+    public function testChunkPreservesElementTypesThroughDirectAndSavedPolymorphicClosures(): void
+    {
+        /** @var iterable<int> $values */
+        $values = [1, 2];
+        $direct = $values |> sequence() |> chunk(2);
+
+        $saved = chunk(1);
+        /** @var iterable<int> $integers */
+        $integers = [1];
+        /** @var iterable<string> $strings */
+        $strings = ['a'];
+        $integerChunks = $integers |> sequence() |> $saved;
+        $stringChunks = $strings |> sequence() |> $saved;
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Sequence<Itera\\Collection<int>>', $direct);
+            assertType('Itera\\Sequence<Itera\\Collection<int>>', $integerChunks);
+            assertType('Itera\\Sequence<Itera\\Collection<string>>', $stringChunks);
+        }
+
+        self::assertSame([1, 2], $direct->collect()->first()?->values());
+        self::assertSame([1], $integerChunks->collect()->first()?->values());
+        self::assertSame(['a'], $stringChunks->collect()->first()?->values());
     }
 
     public function testSavedPolymorphicFactoriesInferEachPipeInputIndependently(): void

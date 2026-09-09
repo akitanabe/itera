@@ -17,6 +17,7 @@ use function Itera\Aggregator\collect as collectWith;
 use function Itera\Aggregator\count as countWith;
 use function Itera\Pipe\aggregate;
 use function Itera\Pipe\associate;
+use function Itera\Pipe\chunk;
 use function Itera\Pipe\collect;
 use function Itera\Pipe\drop;
 use function Itera\Pipe\filter;
@@ -52,6 +53,7 @@ final class PipeTest extends TestCase
             map(static fn(int $value): int => $value),
             scan(0, static fn(int $state, int $value): int => $state + $value),
             tap(static function (int $value): void {}),
+            chunk(2),
             filter(static fn(int $value): bool => $value > 0),
             flatMap(static fn(int $value): iterable => [$value]),
             until(static fn(int $value): bool => $value > 0),
@@ -117,6 +119,39 @@ final class PipeTest extends TestCase
         self::assertSame([1, 3], (Sequence::from([1, 2]) |> $runningTotal |> collect())->values());
         self::assertSame([10, 30], (Sequence::from([10, 20]) |> $runningTotal |> collect())->values());
         self::assertSame([1, 2, 10, 20], $events);
+    }
+
+    public function testChunkPipeValidatesWhenAppliedAndDefersReadingUntilConsumption(): void
+    {
+        $events = [];
+        $source = static function () use (&$events): iterable {
+            $events[] = 'read';
+            yield 1;
+            yield 2;
+            yield 3;
+        };
+        $chunksOfTwo = chunk(2);
+        $sequence = Sequence::from($source());
+
+        self::assertSame([], $events);
+        self::assertSame($sequence, $sequence |> $chunksOfTwo);
+        self::assertSame([], $events);
+        $actualChunks = ($sequence |> collect())->values();
+        self::assertCount(2, $actualChunks);
+        self::assertInstanceOf(Collection::class, $actualChunks[0]);
+        self::assertInstanceOf(Collection::class, $actualChunks[1]);
+        self::assertSame([1, 2], $actualChunks[0]->values());
+        self::assertSame([3], $actualChunks[1]->values());
+        self::assertSame(['read'], $events);
+
+        $invalid = chunk(0);
+        $intact = Sequence::of(1);
+        $this->expectExceptionFrom(static fn(): Sequence => $intact |> $invalid, InvalidArgumentException::class);
+        self::assertSame([1], $intact->collect()->values());
+
+        $consumed = Sequence::of(1);
+        $consumed->collect();
+        $this->expectExceptionFrom(static fn(): Sequence => $consumed |> $invalid, SequenceConsumedException::class);
     }
 
     public function testScanPipeDefersWorkUntilConsumptionAndReturnsTheSameSequence(): void

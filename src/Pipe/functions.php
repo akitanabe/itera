@@ -53,6 +53,30 @@ function tap(callable $effect): Closure
 }
 
 /**
+ * @return Closure<T>(Sequence<T>): Sequence<Collection<T>>
+ */
+function chunk(int $size): Closure
+{
+    $adapter = new readonly class($size) {
+        public function __construct(
+            private int $size,
+        ) {}
+
+        /**
+         * @template T
+         * @param Sequence<T> $sequence
+         * @return Sequence<Collection<T>>
+         */
+        public function __invoke(Sequence $sequence): Sequence
+        {
+            return $sequence->chunk($this->size);
+        }
+    };
+
+    return $adapter(...);
+}
+
+/**
  * @template T
  * @param callable(T): bool $predicate
  * @return Closure(Sequence<T>): Sequence<T>

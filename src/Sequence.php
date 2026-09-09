@@ -7,9 +7,10 @@ namespace Itera;
 use Closure;
 use Generator;
 use InvalidArgumentException;
+use Itera\Internal\SequenceChunk;
 use Itera\Internal\SequenceInputFrame;
 use Itera\Internal\SequenceOperation;
-use Itera\Internal\SequencePipeline;
+use Itera\Internal\SequencePipelineBuilder;
 use Itera\Internal\SequenceStep;
 use IteratorAggregate;
 use Traversable;
@@ -31,7 +32,7 @@ final class Sequence implements IteratorAggregate
     /** @var iterable<mixed> */
     private iterable $source;
 
-    /** @var list<Closure(mixed, int): SequenceStep> */
+    /** @var list<(Closure(mixed, int): SequenceStep)|SequenceChunk> */
     private array $operations = [];
 
     private bool $consumed = false;
@@ -141,6 +142,31 @@ final class Sequence implements IteratorAggregate
     {
         $this->assertNotConsumed();
         $this->operations[] = SequenceOperation::tap($effect);
+
+        return $this;
+    }
+
+    /**
+     * Lazily materializes consecutive values into fresh fixed-size
+     * collections. A non-empty tail is emitted only when the upstream
+     * completes normally.
+     *
+     * Static analysis updates the type of the receiver. References that alias
+     * the receiver before this call cannot reliably reflect that type change.
+     *
+     * @return self<Collection<T>>
+     * @phpstan-self-out self<Collection<T>>
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     * @throws InvalidArgumentException If size is not positive.
+     */
+    public function chunk(int $size): self
+    {
+        $this->assertNotConsumed();
+        if ($size <= 0) {
+            throw new InvalidArgumentException('Chunk size must be positive.');
+        }
+
+        $this->operations[] = new SequenceChunk($size);
 
         return $this;
     }
@@ -341,10 +367,7 @@ final class Sequence implements IteratorAggregate
 
     private function __clone(): void {}
 
-    /**
-     * @mago-expect lint:inline-variable-return
-     * @return Generator<int, T, void, void>
-     */
+    /** @return Generator<int, T, void, void> */
     private function beginConsumption(): Generator
     {
         $this->assertNotConsumed();
@@ -352,11 +375,12 @@ final class Sequence implements IteratorAggregate
 
         // Deferring resolution until iteration would skip it for take(0).
         $this->source = SequenceInputFrame::resolve($this->source);
-        $pipeline = new SequencePipeline($this->source, $this->operations, $this->emptyResult);
+        $iterator = $this->emptyResult
+            ? SequencePipelineBuilder::empty($this->source)
+            : SequencePipelineBuilder::build($this->source, $this->operations);
         $this->operations = [];
 
         /** @var Generator<int, T, void, void> $iterator */
-        $iterator = $pipeline->getIterator();
 
         return $iterator;
     }
