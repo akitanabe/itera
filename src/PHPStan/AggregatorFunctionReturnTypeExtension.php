@@ -18,19 +18,24 @@ use PHPStan\Type\Generic\GenericObjectType;
 use PHPStan\Type\Type;
 use PHPStan\Type\TypeCombinator;
 
+/** @mago-expect lint:cyclomatic-complexity */
 final class AggregatorFunctionReturnTypeExtension implements DynamicFunctionReturnTypeExtension
 {
     private const array FUNCTIONS = [
         'Itera\\Aggregator\\all' => true,
         'Itera\\Aggregator\\any' => true,
         'Itera\\Aggregator\\associate' => true,
+        'Itera\\Aggregator\\countBy' => true,
         'Itera\\Aggregator\\filtering' => true,
         'Itera\\Aggregator\\find' => true,
         'Itera\\Aggregator\\first' => true,
+        'Itera\\Aggregator\\groupBy' => true,
         'Itera\\Aggregator\\flatMapping' => true,
         'Itera\\Aggregator\\folding' => true,
         'Itera\\Aggregator\\mapping' => true,
+        'Itera\\Aggregator\\partition' => true,
         'Itera\\Aggregator\\scanning' => true,
+        'Itera\\Aggregator\\unique' => true,
     ];
 
     public function __construct(
@@ -51,6 +56,9 @@ final class AggregatorFunctionReturnTypeExtension implements DynamicFunctionRetu
         if ($name === 'Itera\\Aggregator\\first') {
             return new FirstAggregatorType();
         }
+        if ($name === 'Itera\\Aggregator\\unique') {
+            return new UniqueAggregatorType();
+        }
         $stateful = $name === 'Itera\\Aggregator\\scanning' || $name === 'Itera\\Aggregator\\folding';
         $inputType = AggregatorCallContext::callbackInputType(
             $functionCall,
@@ -70,6 +78,18 @@ final class AggregatorFunctionReturnTypeExtension implements DynamicFunctionRetu
             return new GenericObjectType(Aggregator::class, [
                 $inputType,
                 new GenericObjectType(Collection::class, [$inputType]),
+            ]);
+        }
+
+        if ($name === 'Itera\\Aggregator\\partition') {
+            $collectionType = new GenericObjectType(Collection::class, [$inputType]);
+
+            return new GenericObjectType(Aggregator::class, [
+                $inputType,
+                new \PHPStan\Type\Constant\ConstantArrayType([
+                    new \PHPStan\Type\Constant\ConstantStringType('matched'),
+                    new \PHPStan\Type\Constant\ConstantStringType('unmatched'),
+                ], [$collectionType, $collectionType]),
             ]);
         }
 
@@ -100,11 +120,18 @@ final class AggregatorFunctionReturnTypeExtension implements DynamicFunctionRetu
             ]);
         }
 
+        $keyType = AggregatorKeyType::fromCall($functionCall, $inputType, $scope, $this->closureTypes);
+        $valueType = match ($name) {
+            'Itera\\Aggregator\\groupBy' => new GenericObjectType(Collection::class, [$inputType]),
+            'Itera\\Aggregator\\countBy' => new \PHPStan\Type\IntegerType(),
+            default => $inputType,
+        };
+
         return new GenericObjectType(Aggregator::class, [
             $inputType,
             new GenericObjectType(Map::class, [
-                AggregatorKeyType::fromCall($functionCall, $inputType, $scope),
-                $inputType,
+                $keyType,
+                $valueType,
             ]),
         ]);
     }

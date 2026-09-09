@@ -100,7 +100,7 @@ final class AggregatorTypeResolver
                 $executionInputType,
             ), $childType->getTypes()));
         }
-        if ($childType instanceof CollectAggregatorType) {
+        if ($childType instanceof CollectAggregatorType || $childType instanceof UniqueAggregatorType) {
             return new GenericObjectType(Collection::class, [$executionInputType]);
         }
         if ($childType instanceof FirstAggregatorType) {

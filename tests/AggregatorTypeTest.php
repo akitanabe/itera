@@ -18,18 +18,24 @@ use function Itera\Aggregator\collect;
 use function Itera\Aggregator\combine;
 use function Itera\Aggregator\combine as combineAlias;
 use function Itera\Aggregator\count;
+use function Itera\Aggregator\countBy;
 use function Itera\Aggregator\filtering;
 use function Itera\Aggregator\find;
 use function Itera\Aggregator\first;
 use function Itera\Aggregator\flatMapping;
 use function Itera\Aggregator\folding;
+use function Itera\Aggregator\groupBy;
+use function Itera\Aggregator\groupBy as groupByAlias;
 use function Itera\Aggregator\join;
 use function Itera\Aggregator\mapping;
 use function Itera\Aggregator\mapping as mappingAlias;
 use function Itera\Aggregator\max;
 use function Itera\Aggregator\min;
+use function Itera\Aggregator\partition;
 use function Itera\Aggregator\scanning;
 use function Itera\Aggregator\sum;
+use function Itera\Aggregator\unique;
+use function Itera\Aggregator\unique as uniqueAlias;
 use function PHPStan\Testing\assertType;
 
 /**
@@ -119,6 +125,63 @@ final class AggregatorTypeTest extends TypeInferenceTestCase
         }
 
         self::assertSame($user, $first);
+    }
+
+    /** @mago-expect lint:prefer-arrow-function */
+    public function testGroupingAggregatorsInferInputsKeysAndResults(): void
+    {
+        $users = [new AggregatorTypeUser(1, true)];
+        $unique = Sequence::from($users)->aggregate(unique());
+        $aliased = Sequence::from($users)->aggregate(uniqueAlias());
+        $grouped = Sequence::from($users)->aggregate(groupBy(static fn($user) => $user->id));
+        $aliasedGroups = Sequence::from($users)->aggregate(groupByAlias(static fn($user) => $user->id));
+        $counted = Sequence::from($users)->aggregate(countBy(static function ($user) {
+            return $user->id;
+        }));
+        $partitioned = Sequence::from($users)->aggregate(partition(static fn($user) => $user->active));
+        $savedUnique = unique();
+        $savedGroups = groupBy(static fn(AggregatorTypeUser $user): int => $user->id);
+        $savedCounts = countBy(static fn(AggregatorTypeUser $user): int => $user->id);
+        $savedPartition = partition(static fn(AggregatorTypeUser $user): bool => $user->active);
+        $savedIntegers = Sequence::from([1])->aggregate($savedUnique);
+        $savedStrings = Sequence::from(['value'])->aggregate($savedUnique);
+        $savedGroupResult = Sequence::from($users)->aggregate($savedGroups);
+        $savedCountResult = Sequence::from($users)->aggregate($savedCounts);
+        $savedPartitionResult = Sequence::from($users)->aggregate($savedPartition);
+        $combined = Sequence::from($users)->aggregate(combine(
+            unique: unique(),
+            grouped: groupBy(static function ($user) {
+                return $user->id;
+            }),
+            counted: countBy(static fn($user) => $user->id),
+            partitioned: partition(static fn($user) => $user->active),
+        ));
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>', $unique);
+            assertType('Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>', $aliased);
+            assertType('Itera\\Map<int, Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>>', $grouped);
+            assertType('Itera\\Map<int, Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>>', $aliasedGroups);
+            assertType('Itera\\Map<int, int>', $counted);
+            assertType(
+                'array{matched: Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>, unmatched: Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>}',
+                $partitioned,
+            );
+            assertType('Itera\\Collection<int>', $savedIntegers);
+            assertType('Itera\\Collection<string>', $savedStrings);
+            assertType('Itera\\Map<int, Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>>', $savedGroupResult);
+            assertType('Itera\\Map<int, int>', $savedCountResult);
+            assertType(
+                'array{matched: Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>, unmatched: Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>}',
+                $savedPartitionResult,
+            );
+            assertType(
+                'array{unique: Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>, grouped: Itera\\Map<int, Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>>, counted: Itera\\Map<int, int>, partitioned: array{matched: Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>, unmatched: Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>}}',
+                $combined,
+            );
+        }
+
+        self::assertSame($users, $unique->values());
     }
 
     /**

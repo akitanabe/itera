@@ -97,7 +97,7 @@ $chunks = Sequence::from([1, 2, 3, 4, 5])
 
 ### Aggregator
 
-`Aggregator<T, R>` は `Sequence<T>` の出力を `R` に集約する、再利用可能な定義です。`Itera\Aggregator` 名前空間には `count()`、`any($predicate)`、`all($predicate)`、`collect()`、`associate($keySelector)`、`mapping($mapper)`、`filtering($predicate)`、`flatMapping($mapper)`、`scanning($initial, $step)`、`folding($initial, $step)`、`sum()`、`min()`、`max()`、`average()`、`find($predicate)`、`first()`、`join($separator)`、`combine(...$aggregators)` があります。公開された `AggregatorExecution<T, R>` を実装する実行 factory は `Aggregator::custom()` で定義できます。定義を作った時点では source、callback、custom factory を実行せず、`Sequence::aggregate()` に渡した時点でその Sequence を消費します。同じ定義を別の Sequence に再利用でき、実行ごとの状態や materialized な結果は共有されません。
+`Aggregator<T, R>` は `Sequence<T>` の出力を `R` に集約する、再利用可能な定義です。`Itera\Aggregator` 名前空間には `count()`、`any($predicate)`、`all($predicate)`、`collect()`、`associate($keySelector)`、`mapping($mapper)`、`filtering($predicate)`、`flatMapping($mapper)`、`scanning($initial, $step)`、`folding($initial, $step)`、`sum()`、`min()`、`max()`、`average()`、`find($predicate)`、`first()`、`unique()`、`groupBy($keySelector)`、`partition($predicate)`、`countBy($keySelector)`、`join($separator)`、`combine(...$aggregators)` があります。公開された `AggregatorExecution<T, R>` を実装する実行 factory は `Aggregator::custom()` で定義できます。定義を作った時点では source、callback、custom factory を実行せず、`Sequence::aggregate()` に渡した時点でその Sequence を消費します。同じ定義を別の Sequence に再利用でき、実行ごとの状態や materialized な結果は共有されません。
 
 custom execution は一回の集約の可変状態を保持し、未完了の間だけ `advance()` で値を受け取り、`isComplete()` で早期終了を示し、`finish()` で結果を返します。`isComplete()` は繰り返し問い合わせられ、完了後に未完了へ戻してはいけません。正常経路では `finish()` が一度呼ばれますが、例外時の cleanup hook ではありません。
 
@@ -142,6 +142,25 @@ $pipeResult = [1, 2, 3] |> sequence() |> aggregate($average);
 $summary = Sequence::from([1, 2, 3])->aggregate(combine(average: $average, count: countWith()));
 ```
 
+| Aggregator | 結果 | 空入力 |
+| --- | --- | --- |
+| `mapping($mapper)` | 変換値を入力順に持つ `Collection` | 空の `Collection` |
+| `filtering($predicate)` | predicate が truthy となる元の値を入力順に持つ `Collection` | 空の `Collection` |
+| `flatMapping($mapper)` | 各 iterable の値を外側・内側の順に持つ `Collection` | 空の `Collection` |
+| `scanning($initial, $step)` | 入力ごとの更新後 state を持つ `Collection` | 空の `Collection` |
+| `folding($initial, $step)` | 最終 state | `initial` |
+| `sum()` | PHP 加算による `int\|float` | `0` |
+| `min()` | 最小の `int\|float` | `null` |
+| `max()` | 最大の `int\|float` | `null` |
+| `average()` | float の平均 | `null` |
+| `find($predicate)` | predicate が最初に truthy となる値 | `null` |
+| `first()` | `null` を含む最初の値 | `null` |
+| `unique()` | strict に重複を除いた `Collection` | 空の `Collection` |
+| `groupBy($keySelector)` | key ごとの `Collection` を持つ `Map` | 空の `Map` |
+| `partition($predicate)` | `matched` と `unmatched` の `Collection` | 両方が空の `Collection` |
+| `countBy($keySelector)` | key ごとの件数を持つ `Map` | 空の `Map` |
+| `join($separator)` | separator で結合した string | 空文字列 |
+
 `count()` は空で `0`、`any()` は空で `false`、`all()` は空で `true` を返します。`any()` は最初の truthy、`all()` は最初の falsy で読み取りを止めます。`collect()` は毎回新しい `Collection` を作り、`associate()` は毎回新しい `Map` を作ります。`associate()` の重複 key は後勝ちです。`count()`、`collect()`、`associate()` は有限な出力を必要とします。
 
 `mapping()` は変換結果、`filtering()` は predicate が truthy になった元の値、`flatMapping()` は各 mapper が返す iterable の値を、入力順に新しい `Collection` へ格納します。`flatMapping()` は内側 iterable の key を捨て、外側と内側の順序を保ちます。いずれも空入力では空の `Collection` を返します。内側 iterable が無限の場合、`flatMapping()` はその入力値の処理から戻りません。
@@ -156,6 +175,10 @@ $summary = Sequence::from([1, 2, 3])->aggregate(combine(average: $average, count
 
 `join($separator)` は string 値の間だけ separator を挿入し、空入力では空文字列を返します。空文字列の要素も1要素として扱うため、`['', 'a', '']` を `'|'` で結合した結果は `'|a|'` です。入力を最後まで消費するため、無限入力では完了しません。
 
+`unique()` は `Collection::contains()` と同じ strict な PHP 比較を使い、最初の出現順を保ちます。`1`、`'1'`、`1.0` は別の値です。同じ object は重複しますが、同じプロパティを持つ別 object は重複せず、NaN は自身とも一致しません。既採用値を順に探索するため、最悪計算量は O(n²)、保持領域は一意な値の数に対して O(u) です。
+
+`groupBy()` はグループの初出順と各グループ内の入力順を保ちます。`countBy()` は値を保持せず key ごとの件数を返します。両方とも PHP 配列 key の正規化に従うため、PHP が整数 key に正規化する形式の文字列（例: `'1'`）と整数 `1` は同じ Map の key になります。`partition()` は PHP truthiness により各値を `matched` または `unmatched` の一方へ入力順に格納します。これら4関数は入力を最後まで消費するため、無限入力では完了しません。
+
 ```php
 use function Itera\Aggregator\{
     any,
@@ -163,6 +186,10 @@ use function Itera\Aggregator\{
     collect as collectWith,
     combine,
     count as countWith,
+    folding,
+    groupBy,
+    mapping,
+    scanning,
 };
 
 $collectedUsers = $users->sequence()->aggregate(collectWith());
@@ -178,7 +205,21 @@ $summary = $users->sequence()->aggregate(combine(
     byId: associateWith(fn (User $user): int => $user->id),
 ));
 // array{count: int, active: bool, items: Collection<User>, byId: Map<int, User>}
+
+$independent = Sequence::from([1, 2, 3])->aggregate(combine(
+    mapped: mapping(fn (int $value): int => $value * 10),
+    running: scanning(0, fn (int $state, int $value): int => $state + $value),
+    total: folding(0, fn (int $state, int $value): int => $state + $value),
+    groups: groupBy(fn (int $value): string => $value % 2 === 0 ? 'even' : 'odd'),
+));
+$independent['mapped']->values(); // [10, 20, 30]
+$independent['running']->values(); // [1, 3, 6]
+$independent['total']; // 6
+$independent['groups']->get('odd')?->values(); // [1, 3]
+$independent['groups']->get('even')?->values(); // [2]
 ```
+
+`combine()` の各枝は同じ pipeline 出力を独立して集約します。上の `mapping()` は `mapped` だけを変換し、他の枝は元の `1`、`2`、`3` を受け取ります。
 
 `combine()` は一個以上の名前付き Aggregator を受け取る Aggregator 定義を返します。各子 Aggregator は対象 `Sequence` の要素型を受け取れる必要があり、合成後の入力型には子が共有する制約が残ります。custom Aggregator も組み込み Aggregator と同じ平坦な named combine に指定できます。静的解析では PHPStan 拡張が、`combine()` の広い PHPDoc 入力・結果型を、子ごとの callback 入力契約と名前付き結果型へ具体化します。`aggregate()` で実行すると、子の名前と指定順を保つ結果配列を返します。位置引数と `combine()` の入れ子は受け付けません。入力は一度だけ走査され、各値は未完了の子へ指定順に渡されます。完了した子の callback は以後呼ばれず、すべての子が完了すれば source の読み取りも止まります。`count()`、`collect()`、`associate()` のように全件を読む子を含む場合、合成全体も source の終端まで読みます。
 

@@ -25,11 +25,14 @@ final class AggregatorCallbackTypeExtension implements FunctionParameterClosureT
         'Itera\\Aggregator\\all' => true,
         'Itera\\Aggregator\\any' => true,
         'Itera\\Aggregator\\associate' => true,
+        'Itera\\Aggregator\\countBy' => true,
         'Itera\\Aggregator\\filtering' => true,
         'Itera\\Aggregator\\find' => true,
+        'Itera\\Aggregator\\groupBy' => true,
         'Itera\\Aggregator\\flatMapping' => true,
         'Itera\\Aggregator\\folding' => true,
         'Itera\\Aggregator\\mapping' => true,
+        'Itera\\Aggregator\\partition' => true,
         'Itera\\Aggregator\\scanning' => true,
         'Itera\\Pipe\\associate' => true,
     ];
@@ -70,12 +73,16 @@ final class AggregatorCallbackTypeExtension implements FunctionParameterClosureT
             ? $scope->getType($functionCall->getArgs()[0]->value)->generalize(GeneralizePrecision::lessSpecific())
             : new MixedType();
         $returnType = match ($name) {
-            'Itera\\Aggregator\\associate' => TypeCombinator::union(new IntegerType(), new StringType()),
+            'Itera\\Aggregator\\associate',
+            'Itera\\Aggregator\\countBy',
+            'Itera\\Aggregator\\groupBy',
+                => TypeCombinator::union(new IntegerType(), new StringType()),
             'Itera\\Pipe\\associate' => TypeCombinator::union(new IntegerType(), new StringType()),
             'Itera\\Aggregator\\all',
             'Itera\\Aggregator\\any',
             'Itera\\Aggregator\\filtering',
             'Itera\\Aggregator\\find',
+            'Itera\\Aggregator\\partition',
                 => new BooleanType(),
             'Itera\\Aggregator\\flatMapping' => new IterableType(new MixedType(), new MixedType()),
             'Itera\\Aggregator\\folding', 'Itera\\Aggregator\\scanning' => $stateType,

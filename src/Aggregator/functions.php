@@ -236,3 +236,57 @@ function join(string $separator): Aggregator
 {
     return Aggregator::custom(AggregatorBuiltIns::join($separator));
 }
+
+/**
+ * Defines an aggregation that keeps the first strictly equal occurrence of each value.
+ * Each execution creates a fresh Collection and preserves first appearance order.
+ *
+ * @return Aggregator<mixed, Collection<mixed>>
+ */
+function unique(): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::unique());
+}
+
+/**
+ * Defines an aggregation that groups values by selected PHP array keys.
+ * Group order and the input order within each group are preserved.
+ *
+ * @template T
+ * @template TKey of array-key
+ * @param callable(T): TKey $keySelector
+ * @return Aggregator<T, Map<TKey, Collection<T>>>
+ * @mago-expect lint:function-name
+ */
+function groupBy(callable $keySelector): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::groupBy($keySelector));
+}
+
+/**
+ * Defines an aggregation that separates values by PHP runtime truthiness.
+ * Both result Collections preserve input order.
+ *
+ * @template T
+ * @param callable(T): bool $predicate
+ * @return Aggregator<T, array{matched: Collection<T>, unmatched: Collection<T>}>
+ */
+function partition(callable $predicate): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::partition($predicate));
+}
+
+/**
+ * Defines an aggregation that counts values by selected PHP array keys.
+ * Key order follows first appearance, and empty input returns an empty Map.
+ *
+ * @template T
+ * @template TKey of array-key
+ * @param callable(T): TKey $keySelector
+ * @return Aggregator<T, Map<TKey, int>>
+ * @mago-expect lint:function-name
+ */
+function countBy(callable $keySelector): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::countBy($keySelector));
+}

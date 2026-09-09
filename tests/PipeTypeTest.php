@@ -15,8 +15,10 @@ use function Itera\Aggregator\collect as collectWith;
 use function Itera\Aggregator\combine as combineWith;
 use function Itera\Aggregator\count as countWith;
 use function Itera\Aggregator\first as firstWith;
+use function Itera\Aggregator\groupBy as groupByWith;
 use function Itera\Aggregator\mapping as mappingWith;
 use function Itera\Aggregator\sum as sumWith;
+use function Itera\Aggregator\unique as uniqueWith;
 use function Itera\Pipe\aggregate;
 use function Itera\Pipe\associate;
 use function Itera\Pipe\chunk;
@@ -35,7 +37,10 @@ use function Itera\Pipe\tap;
 use function Itera\Pipe\until;
 use function PHPStan\Testing\assertType;
 
-/** @mago-expect lint:too-many-methods */
+/**
+ * @mago-expect lint:cyclomatic-complexity
+ * @mago-expect lint:too-many-methods
+ */
 final class PipeTypeTest extends TypeInferenceTestCase
 {
     /** @return list<string> */
@@ -262,6 +267,25 @@ final class PipeTypeTest extends TypeInferenceTestCase
         }
 
         self::assertInstanceOf(PipeTypeUser::class, $result);
+    }
+
+    public function testUniqueAggregatorSpecializesThroughDirectAndSavedPipeClosures(): void
+    {
+        $direct = [new PipeTypeUser(1, true)] |> sequence() |> aggregate(uniqueWith());
+        $grouped = [new PipeTypeUser(1, true)] |> sequence() |> aggregate(groupByWith(static fn($user) => $user->id));
+        $saved = aggregate(uniqueWith());
+        $integers = Sequence::from([1, 1]) |> $saved;
+        $strings = Sequence::from(['value', 'value']) |> $saved;
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Collection<Itera\\Tests\\PipeTypeUser>', $direct);
+            assertType('Itera\\Map<int, Itera\\Collection<Itera\\Tests\\PipeTypeUser>>', $grouped);
+            assertType('Itera\\Collection<int>', $integers);
+            assertType('Itera\\Collection<string>', $strings);
+        }
+
+        self::assertSame([1], $integers->values());
+        self::assertSame(['value'], $strings->values());
     }
 
     public function testCustomAggregatorPreservesItsTypeThroughPipeAggregate(): void

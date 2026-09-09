@@ -359,6 +359,110 @@ final class AggregatorBuiltIns
         };
     }
 
+    /** @return Closure(): AggregatorExecution<mixed, Collection<mixed>> */
+    public static function unique(): Closure
+    {
+        return static function (): AggregatorExecution {
+            $state = new AggregatorCollectionState();
+
+            return new AggregatorExecution(
+                static function (mixed $value) use ($state): bool {
+                    if (!in_array($value, $state->values(), strict: true)) {
+                        $state->append($value);
+                    }
+
+                    return false;
+                },
+                static fn(): Collection => Collection::from($state->values()),
+            );
+        };
+    }
+
+    /**
+     * @template T
+     * @template TKey of array-key
+     * @param callable(T): TKey $keySelector
+     * @return Closure(): AggregatorExecution<T, Map<TKey, Collection<T>>>
+     * @mago-expect lint:inline-variable-return
+     */
+    public static function groupBy(callable $keySelector): Closure
+    {
+        /** @var Closure(): AggregatorExecution<T, Map<TKey, Collection<T>>> $executionFactory */
+        $executionFactory = static function () use ($keySelector): AggregatorExecution {
+            /** @var AggregatorGroupState<TKey, T> $state */
+            $state = new AggregatorGroupState();
+
+            return new AggregatorExecution(static function (mixed $value) use ($keySelector, $state): bool {
+                $state->append($keySelector($value), $value);
+
+                return false;
+            }, static function () use ($state): Map {
+                /** @var array<TKey, Collection<T>> $groups */
+                $groups = [];
+                foreach ($state->groups() as $key => $values) {
+                    $groups[$key] = Collection::from($values);
+                }
+
+                return Map::from($groups);
+            });
+        };
+
+        return $executionFactory;
+    }
+
+    /**
+     * @template T
+     * @param callable(T): bool $predicate
+     * @return Closure(): AggregatorExecution<T, array{matched: Collection<T>, unmatched: Collection<T>}>
+     * @mago-expect lint:inline-variable-return
+     */
+    public static function partition(callable $predicate): Closure
+    {
+        /** @var Closure(): AggregatorExecution<T, array{matched: Collection<T>, unmatched: Collection<T>}> $executionFactory */
+        $executionFactory = static function () use ($predicate): AggregatorExecution {
+            $matched = new AggregatorCollectionState();
+            $unmatched = new AggregatorCollectionState();
+
+            return new AggregatorExecution(static function (mixed $value) use ($predicate, $matched, $unmatched): bool {
+                ($predicate($value) ? $matched : $unmatched)->append($value);
+
+                return false;
+            }, static fn(): array => [
+                'matched' => Collection::from($matched->values()),
+                'unmatched' => Collection::from($unmatched->values()),
+            ]);
+        };
+
+        return $executionFactory;
+    }
+
+    /**
+     * @template T
+     * @template TKey of array-key
+     * @param callable(T): TKey $keySelector
+     * @return Closure(): AggregatorExecution<T, Map<TKey, int>>
+     * @mago-expect lint:inline-variable-return
+     */
+    public static function countBy(callable $keySelector): Closure
+    {
+        /** @var Closure(): AggregatorExecution<T, Map<TKey, int>> $executionFactory */
+        $executionFactory = static function () use ($keySelector): AggregatorExecution {
+            /** @var AggregatorCountByState<TKey> $state */
+            $state = new AggregatorCountByState();
+
+            return new AggregatorExecution(
+                static function (mixed $value) use ($keySelector, $state): bool {
+                    $state->increment($keySelector($value));
+
+                    return false;
+                },
+                static fn(): Map => Map::from($state->counts()),
+            );
+        };
+
+        return $executionFactory;
+    }
+
     /**
      * @param Closure(int|float, int|float): bool $better
      * @return Closure(): AggregatorExecution<int|float, int|float|null>

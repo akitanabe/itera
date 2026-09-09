@@ -19,11 +19,14 @@ final class AggregatorContextVisitor extends NodeVisitorAbstract
         'Itera\\Aggregator\\all' => true,
         'Itera\\Aggregator\\any' => true,
         'Itera\\Aggregator\\associate' => true,
+        'Itera\\Aggregator\\countBy' => true,
         'Itera\\Aggregator\\filtering' => true,
         'Itera\\Aggregator\\find' => true,
+        'Itera\\Aggregator\\groupBy' => true,
         'Itera\\Aggregator\\flatMapping' => true,
         'Itera\\Aggregator\\folding' => true,
         'Itera\\Aggregator\\mapping' => true,
+        'Itera\\Aggregator\\partition' => true,
         'Itera\\Aggregator\\scanning' => true,
     ];
 

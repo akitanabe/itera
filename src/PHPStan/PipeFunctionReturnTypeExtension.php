@@ -9,6 +9,7 @@ use Itera\Collection;
 use Itera\Map;
 use Itera\Sequence;
 use PhpParser\Node\Expr\FuncCall;
+use PHPStan\Analyser\ExprHandler\Helper\ClosureTypeResolver;
 use PHPStan\Analyser\Scope;
 use PHPStan\Reflection\FunctionReflection;
 use PHPStan\Type\ClosureType;
@@ -31,6 +32,10 @@ final class PipeFunctionReturnTypeExtension implements DynamicFunctionReturnType
         'Itera\\Pipe\\associate' => true,
     ];
 
+    public function __construct(
+        private readonly ClosureTypeResolver $closureTypes,
+    ) {}
+
     public function isFunctionSupported(FunctionReflection $functionReflection): bool
     {
         return array_key_exists($functionReflection->getName(), self::FUNCTIONS);
@@ -49,7 +54,7 @@ final class PipeFunctionReturnTypeExtension implements DynamicFunctionReturnType
             }
 
             return self::closure($contextualInputType, new GenericObjectType(Map::class, [
-                AggregatorKeyType::fromCall($functionCall, $contextualInputType, $scope),
+                AggregatorKeyType::fromCall($functionCall, $contextualInputType, $scope, $this->closureTypes),
                 $contextualInputType,
             ]));
         }
@@ -74,10 +79,10 @@ final class PipeFunctionReturnTypeExtension implements DynamicFunctionReturnType
                 $inputType,
             ));
         }
-        if ($definitionType instanceof CollectAggregatorType) {
+        if ($definitionType instanceof CollectAggregatorType || $definitionType instanceof UniqueAggregatorType) {
             return (
                 $inputType === null
-                    ? self::polymorphicCollectClosure()
+                    ? self::polymorphicCollectionClosure()
                     : self::closure($inputType, new GenericObjectType(Collection::class, [$inputType]))
             );
         }
@@ -110,7 +115,7 @@ final class PipeFunctionReturnTypeExtension implements DynamicFunctionReturnType
         );
     }
 
-    private static function polymorphicCollectClosure(): ClosureType
+    private static function polymorphicCollectionClosure(): ClosureType
     {
         // @phpstan-ignore phpstanApi.method (Saved polymorphic pipe closures require a template type; this is verified against the documented supported PHPStan version.)
         $template = TemplateTypeFactory::create(

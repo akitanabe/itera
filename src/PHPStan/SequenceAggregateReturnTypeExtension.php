@@ -44,7 +44,7 @@ final class SequenceAggregateReturnTypeExtension implements DynamicMethodReturnT
         if ($aggregatorType instanceof FirstAggregatorType) {
             return TypeCombinator::addNull($elementType);
         }
-        if (!$aggregatorType instanceof CollectAggregatorType) {
+        if (!$aggregatorType instanceof CollectAggregatorType && !$aggregatorType instanceof UniqueAggregatorType) {
             return null;
         }
 
