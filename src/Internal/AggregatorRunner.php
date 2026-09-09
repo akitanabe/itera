@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Itera\Internal;
 
+use Itera\AggregatorExecution;
+
 /** @internal */
 final class AggregatorRunner
 {
@@ -16,6 +18,10 @@ final class AggregatorRunner
      */
     public static function execute(iterable $values, AggregatorExecution $execution): mixed
     {
+        if ($execution->isComplete()) {
+            return $execution->finish();
+        }
+
         foreach ($values as $value) {
             $execution->advance($value);
             if ($execution->isComplete()) {

@@ -197,6 +197,28 @@ final class AggregatorTypeTest extends TypeInferenceTestCase
         self::assertTrue(Sequence::from([new AggregatorTypeUser(1, true)])->aggregate($accepted));
     }
 
+    public function testCustomFactoryInfersItsExecutionInputAndResultTypes(): void
+    {
+        $definition = Aggregator::custom(static fn() => new AggregatorCustomExecution());
+        $alias = $definition;
+        $result = Sequence::from([1, 2])->aggregate($definition);
+        $combined = Sequence::from([1])->aggregate(combine(custom: $alias, total: count()));
+        $wideInput = Aggregator::custom(static fn() => new WideCustomExecution());
+        $acceptedWideInput = self::acceptsUserAggregator($wideInput);
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Aggregator<int, string>', $definition);
+            assertType('Itera\\Aggregator<int, string>', $alias);
+            assertType('string', $result);
+            assertType('array{custom: string, total: int}', $combined);
+            assertType('Itera\\Aggregator<Itera\\Tests\\AggregatorTypeUser, mixed>', $acceptedWideInput);
+        }
+
+        self::assertSame('1,2', $result);
+        self::assertSame('1', $combined['custom']);
+        self::assertTrue(Sequence::from([new AggregatorTypeUser(1, true)])->aggregate($acceptedWideInput));
+    }
+
     /**
      * @param Aggregator<AggregatorTypeUser, mixed> $aggregator
      * @return Aggregator<AggregatorTypeUser, mixed>

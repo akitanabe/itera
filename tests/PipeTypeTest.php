@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Itera\Tests;
 
+use Itera\Aggregator;
 use Itera\Sequence;
 use PHPStan\Testing\TypeInferenceTestCase;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
@@ -155,6 +156,18 @@ final class PipeTypeTest extends TypeInferenceTestCase
         }
 
         self::assertSame([1, 2], $collection->values());
+    }
+
+    public function testCustomAggregatorPreservesItsTypeThroughPipeAggregate(): void
+    {
+        $definition = Aggregator::custom(static fn() => new AggregatorCustomExecution());
+        $result = [1, 2] |> sequence() |> aggregate($definition);
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('string', $result);
+        }
+
+        self::assertSame('1,2', $result);
     }
 
     public function testSavedAggregateClosuresPreserveDefinitionsAndPolymorphicCollect(): void

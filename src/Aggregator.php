@@ -5,24 +5,43 @@ declare(strict_types=1);
 namespace Itera;
 
 use Closure;
+use Itera\AggregatorExecution as PublicAggregatorExecution;
 use Itera\Internal\AggregatorBuiltIns;
 use Itera\Internal\AggregatorCombinedExecution;
-use Itera\Internal\AggregatorExecution;
 use Itera\Internal\AggregatorRunner;
 
 /**
- * A reusable built-in aggregation definition.
+ * A reusable aggregation definition.
  *
  * @template-contravariant T
  * @template-covariant R
  */
 final class Aggregator
 {
-    /** @param Closure(): AggregatorExecution<T, R> $executionFactory */
+    /** @param Closure(): PublicAggregatorExecution<T, R> $executionFactory */
     private function __construct(
         private readonly Closure $executionFactory,
         private readonly bool $combined = false,
     ) {}
+
+    /**
+     * Defines a reusable custom aggregation.
+     *
+     * The factory is called once for each execution and must return fresh
+     * mutable state for that execution.
+     *
+     * @template TInput
+     * @template TResult
+     * @param callable(): PublicAggregatorExecution<TInput, TResult> $executionFactory
+     * @return self<TInput, TResult>
+     */
+    public static function custom(callable $executionFactory): self
+    {
+        /** @var Closure(): PublicAggregatorExecution<TInput, TResult> $factory */
+        $factory = Closure::fromCallable($executionFactory);
+
+        return new self($factory);
+    }
 
     /**
      * @internal
@@ -96,7 +115,7 @@ final class Aggregator
             }
         }
 
-        return new self(static function () use ($aggregators): AggregatorExecution {
+        return new self(static function () use ($aggregators): PublicAggregatorExecution {
             $factories = [];
             foreach ($aggregators as $name => $aggregator) {
                 $factories[$name] = $aggregator->executionFactory;

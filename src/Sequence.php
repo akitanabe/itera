@@ -271,7 +271,7 @@ final class Sequence implements IteratorAggregate
     }
 
     /**
-     * Consumes the pipeline outputs with a reusable built-in aggregation.
+     * Consumes the pipeline outputs with a reusable aggregation definition.
      *
      * @template R
      * @param Aggregator<T, R> $aggregator

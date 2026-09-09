@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace Itera\Internal;
 
 use Closure;
+use Itera\AggregatorExecution as PublicAggregatorExecution;
 
 /**
  * @internal
  * @template-contravariant T
  * @template-covariant R
+ * @implements PublicAggregatorExecution<T, R>
  */
-final class AggregatorExecution
+final class AggregatorExecution implements PublicAggregatorExecution
 {
     private bool $complete = false;
 
@@ -22,7 +24,10 @@ final class AggregatorExecution
     public function __construct(
         private readonly Closure $advance,
         private readonly Closure $finish,
-    ) {}
+        bool $complete = false,
+    ) {
+        $this->complete = $complete;
+    }
 
     /** @param T $value */
     public function advance(mixed $value): void

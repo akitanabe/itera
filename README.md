@@ -63,7 +63,50 @@ $result = Sequence::from($users)
 
 ### Aggregator
 
-`Aggregator<T, R>` は `Sequence<T>` の出力を `R` に集約する、再利用可能な定義です。`Itera\Aggregator` 名前空間には `count()`、`any($predicate)`、`all($predicate)`、`collect()`、`associate($keySelector)`、`combine(...$aggregators)` があります。定義を作った時点では source、predicate、key selector を実行せず、`Sequence::aggregate()` に渡した時点でその Sequence を消費します。同じ定義を別の Sequence に再利用でき、実行ごとの状態や materialized な結果は共有されません。
+`Aggregator<T, R>` は `Sequence<T>` の出力を `R` に集約する、再利用可能な定義です。`Itera\Aggregator` 名前空間には `count()`、`any($predicate)`、`all($predicate)`、`collect()`、`associate($keySelector)`、`combine(...$aggregators)` があります。公開された `AggregatorExecution<T, R>` を実装する実行 factory は `Aggregator::custom()` で定義できます。定義を作った時点では source、predicate、key selector、custom factory を実行せず、`Sequence::aggregate()` に渡した時点でその Sequence を消費します。同じ定義を別の Sequence に再利用でき、実行ごとの状態や materialized な結果は共有されません。
+
+custom execution は一回の集約の可変状態を保持し、未完了の間だけ `advance()` で値を受け取り、`isComplete()` で早期終了を示し、`finish()` で結果を返します。`isComplete()` は繰り返し問い合わせられ、完了後に未完了へ戻してはいけません。正常経路では `finish()` が一度呼ばれますが、例外時の cleanup hook ではありません。
+
+Aggregator 定義は factory を保持しますが、factory が生成した execution は保持しません。factory は Sequence の消費開始と source の解決に成功して集約実行へ到達した後、実行ごとに一度呼ばれ、毎回 fresh な execution を返す必要があります。同じ execution インスタンスを複数回返してはいけません。外部 mutable state を capture した場合の実行間の状態分離は利用者の責任です。
+
+初期状態が完了していても IteratorAggregate の source 解決は先に行われます。その後は source の値、pipeline callback、`advance()` を実行せず、`finish()` だけを呼びます。factory、execution、source、pipeline の例外はそのまま伝播し、完了した値の直後で読み取りを止めます。失敗した Sequence は消費済みのままですが、定義は別の Sequence で再利用できます。`count()`、`collect()`、`associate()` と同様、全件を読む custom execution には有限な入力が必要です。
+
+```php
+use Itera\Aggregator;
+use Itera\AggregatorExecution;
+use Itera\Sequence;
+use function Itera\Aggregator\combine;
+use function Itera\Aggregator\count as countWith;
+use function Itera\Pipe\{aggregate, sequence};
+
+/** @implements AggregatorExecution<int, float> */
+final class AverageExecution implements AggregatorExecution
+{
+    private int $count = 0;
+    private int $sum = 0;
+
+    public function advance(mixed $value): void
+    {
+        $this->sum += $value;
+        ++$this->count;
+    }
+
+    public function isComplete(): bool
+    {
+        return false;
+    }
+
+    public function finish(): float
+    {
+        return $this->count === 0 ? 0.0 : $this->sum / $this->count;
+    }
+}
+
+$average = Aggregator::custom(static fn() => new AverageExecution());
+$result = Sequence::from([1, 2, 3])->aggregate($average);
+$pipeResult = [1, 2, 3] |> sequence() |> aggregate($average);
+$summary = Sequence::from([1, 2, 3])->aggregate(combine(average: $average, count: countWith()));
+```
 
 `count()` は空で `0`、`any()` は空で `false`、`all()` は空で `true` を返します。`any()` は最初の truthy、`all()` は最初の falsy で読み取りを止めます。`collect()` は毎回新しい `Collection` を作り、`associate()` は毎回新しい `Map` を作ります。`associate()` の重複 key は後勝ちです。`count()`、`collect()`、`associate()` は有限な出力を必要とします。
 
@@ -91,9 +134,9 @@ $summary = $users->sequence()->aggregate(combine(
 // array{count: int, active: bool, items: Collection<User>, byId: Map<int, User>}
 ```
 
-`combine()` は一個以上の名前付き Aggregator を受け取る Aggregator 定義を返します。各子 Aggregator は対象 `Sequence` の要素型を受け取れる必要があり、合成後の入力型には子が共有する制約が残ります。静的解析では PHPStan 拡張が、`combine()` の広い PHPDoc 入力・結果型を、子ごとの callback 入力契約と名前付き結果型へ具体化します。`aggregate()` で実行すると、子の名前と指定順を保つ結果配列を返します。位置引数と `combine()` の入れ子は受け付けません。入力は一度だけ走査され、各値は未完了の子へ指定順に渡されます。完了した子の callback は以後呼ばれず、すべての子が完了すれば source の読み取りも止まります。`count()`、`collect()`、`associate()` のように全件を読む子を含む場合、合成全体も source の終端まで読みます。
+`combine()` は一個以上の名前付き Aggregator を受け取る Aggregator 定義を返します。各子 Aggregator は対象 `Sequence` の要素型を受け取れる必要があり、合成後の入力型には子が共有する制約が残ります。custom Aggregator も組み込み Aggregator と同じ平坦な named combine に指定できます。静的解析では PHPStan 拡張が、`combine()` の広い PHPDoc 入力・結果型を、子ごとの callback 入力契約と名前付き結果型へ具体化します。`aggregate()` で実行すると、子の名前と指定順を保つ結果配列を返します。位置引数と `combine()` の入れ子は受け付けません。入力は一度だけ走査され、各値は未完了の子へ指定順に渡されます。完了した子の callback は以後呼ばれず、すべての子が完了すれば source の読み取りも止まります。`count()`、`collect()`、`associate()` のように全件を読む子を含む場合、合成全体も source の終端まで読みます。
 
-`fold($initial, $step)` は呼び出しごとに初期値を渡す単純な左 fold で、Aggregator の定義ではありません。利用者定義の Aggregator は現在の採用範囲に含みません。
+`fold($initial, $step)` は呼び出しごとに初期値を渡す単純な左 fold で、Aggregator の定義ではありません。
 
 ### Pipe facade
 
