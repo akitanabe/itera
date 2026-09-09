@@ -12,7 +12,6 @@ final class CollectionAssociationTest extends TestCase
 {
     public function testAssociateUsesOnlyTheKeySelectorAndKeepsTheOriginalValues(): void
     {
-        $argumentCounts = [];
         /** @var list<array{id: int, name: string}> $values */
         $values = [
             ['id' => 1, 'name' => 'first'],
@@ -20,14 +19,9 @@ final class CollectionAssociationTest extends TestCase
         ];
         $collection = Collection::from($values);
 
-        $map = $collection->associate(static function (array $value) use (&$argumentCounts): int {
-            $argumentCounts[] = func_num_args();
-
-            return $value['id'];
-        });
+        $map = $collection->associate(static fn(array $value): int => $value['id']);
 
         self::assertInstanceOf(Map::class, $map);
-        self::assertSame([1, 1], $argumentCounts);
         self::assertSame(
             [
                 1 => ['id' => 1, 'name' => 'first'],

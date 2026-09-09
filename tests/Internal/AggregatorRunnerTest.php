@@ -124,12 +124,14 @@ final class AggregatorRunnerTest extends TestCase
             throw $expected;
         });
 
+        $actual = null;
         try {
             AggregatorRunner::execute([], $execution);
-        } catch (\RuntimeException $actual) {
-            self::assertSame($expected, $actual);
+        } catch (\RuntimeException $caught) {
+            $actual = $caught;
         }
 
+        self::assertSame($expected, $actual);
         self::assertSame(1, $finishes);
     }
 }

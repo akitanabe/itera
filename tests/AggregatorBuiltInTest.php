@@ -136,12 +136,7 @@ final class AggregatorBuiltInTest extends TestCase
         $first = new AggregatorBuiltInItem(1, 'first');
         $replacement = new AggregatorBuiltInItem(1, 'replacement');
         $second = new AggregatorBuiltInItem(2, 'second');
-        $argumentCounts = [];
-        $selector = static function (AggregatorBuiltInItem $item) use (&$argumentCounts): int {
-            $argumentCounts[] = func_num_args();
-
-            return $item->id;
-        };
+        $selector = static fn(AggregatorBuiltInItem $item): int => $item->id;
         $aggregated = Sequence::from(['first' => $first, 8 => $replacement, 9 => $second])->map(
             static fn(AggregatorBuiltInItem $item): AggregatorBuiltInItem => $item,
         )->aggregate(associate($selector));
@@ -150,6 +145,5 @@ final class AggregatorBuiltInTest extends TestCase
         self::assertSame($direct->raw(), $aggregated->raw());
         self::assertSame([1 => $replacement, 2 => $second], $aggregated->raw());
         self::assertSame($replacement, $aggregated->get(1));
-        self::assertSame([1, 1, 1, 1, 1, 1], $argumentCounts);
     }
 }

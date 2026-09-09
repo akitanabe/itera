@@ -73,6 +73,67 @@ final class AggregatorGroupingTest extends TestCase
         self::assertSame([0, '0', ''], $result['unmatched']->values());
     }
 
+    public function testCountByReleasesEarlierValuesBeforeSourceExhaustion(): void
+    {
+        $releasedBeforeEnd = false;
+        $source = static function () use (&$releasedBeforeEnd): iterable {
+            $first = new \stdClass();
+            $reference = \WeakReference::create($first);
+            yield $first;
+            unset($first);
+            yield new \stdClass();
+            yield new \stdClass();
+            $releasedBeforeEnd = $reference->get() === null;
+            yield new \stdClass();
+        };
+
+        $result = Sequence::from($source())->aggregate(countBy(static fn(\stdClass $value): string => 'all'));
+
+        self::assertSame(['all' => 4], $result->raw());
+        self::assertTrue($releasedBeforeEnd);
+    }
+
+    public function testGroupingDefinitionsKeepNonEmptyRunsAndRepeatedBranchesIndependent(): void
+    {
+        $groups = groupBy(static fn(int $value): int => $value % 2);
+        $partitions = partition(static fn(int $value): bool => ($value % 2) === 1);
+        $counts = countBy(static fn(int $value): int => $value % 2);
+        $definition = combine(
+            groups: $groups,
+            repeatedGroups: $groups,
+            partitions: $partitions,
+            repeatedPartitions: $partitions,
+            counts: $counts,
+            repeatedCounts: $counts,
+        );
+
+        $first = Sequence::from([1, 2])->aggregate($definition);
+        $second = Sequence::from([3])->aggregate($definition);
+
+        foreach (['groups', 'repeatedGroups'] as $name) {
+            self::assertSame([1, 0], $first[$name]->keys()->values());
+            self::assertSame([1], $first[$name]->get(1)?->values());
+            self::assertSame([2], $first[$name]->get(0)?->values());
+            self::assertSame([1], $second[$name]->keys()->values());
+            self::assertSame([3], $second[$name]->get(1)?->values());
+        }
+        foreach (['partitions', 'repeatedPartitions'] as $name) {
+            self::assertSame([1], $first[$name]['matched']->values());
+            self::assertSame([2], $first[$name]['unmatched']->values());
+            self::assertSame([3], $second[$name]['matched']->values());
+            self::assertSame([], $second[$name]['unmatched']->values());
+        }
+        foreach (['counts', 'repeatedCounts'] as $name) {
+            self::assertSame([1 => 1, 0 => 1], $first[$name]->raw());
+            self::assertSame([1 => 1], $second[$name]->raw());
+        }
+        self::assertNotSame($first['groups'], $first['repeatedGroups']);
+        self::assertNotSame($first['groups']->get(1), $first['repeatedGroups']->get(1));
+        self::assertNotSame($first['partitions']['matched'], $first['repeatedPartitions']['matched']);
+        self::assertNotSame($first['partitions']['unmatched'], $first['repeatedPartitions']['unmatched']);
+        self::assertNotSame($first['counts'], $first['repeatedCounts']);
+    }
+
     public function testDefinitionsProduceFreshEmptyResultsAndIndependentCombinedBranches(): void
     {
         $unique = unique();

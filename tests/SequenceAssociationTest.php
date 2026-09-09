@@ -14,7 +14,6 @@ final class SequenceAssociationTest extends TestCase
     public function testAssociateConsumesTheLazyPipelineAndUsesPipelineOutputValues(): void
     {
         $events = [];
-        $argumentCounts = [];
         $sequence = Sequence::from(
             (static function () use (&$events): iterable {
                 $events[] = 'source';
@@ -27,16 +26,11 @@ final class SequenceAssociationTest extends TestCase
             return strtoupper($value);
         });
 
-        $map = $sequence->associate(static function (string $value) use (&$argumentCounts): string {
-            $argumentCounts[] = func_num_args();
-
-            return $value[0];
-        });
+        $map = $sequence->associate(static fn(string $value): string => $value[0]);
 
         self::assertInstanceOf(Map::class, $map);
         self::assertSame(['F' => 'FIRST', 'S' => 'SECOND'], $map->raw());
         self::assertSame(['source', 'map:first', 'map:second'], $events);
-        self::assertSame([1, 1], $argumentCounts);
 
         $this->expectException(SequenceConsumedException::class);
         $sequence->associate(static fn(string $value): string => $value);

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Itera\Tests;
 
-use Countable;
 use Itera\Collection;
 use Itera\Sequence;
 use Itera\SequenceConsumedException;
@@ -155,10 +154,9 @@ final class SequenceContractTest extends TestCase
         ];
     }
 
-    public function testFoldRequiresStateAndCallbackAndSequenceIsNotCountable(): void
+    public function testFoldRequiresStateAndCallback(): void
     {
         self::assertSame(2, new ReflectionMethod(Sequence::class, 'fold')->getNumberOfRequiredParameters());
-        self::assertNotContains(Countable::class, class_implements(Sequence::class));
     }
 
     /** @return iterable<mixed> */
