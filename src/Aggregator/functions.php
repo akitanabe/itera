@@ -6,6 +6,7 @@ namespace Itera\Aggregator;
 
 use Itera\Aggregator;
 use Itera\Collection;
+use Itera\Internal\AggregatorBuiltIns;
 use Itera\Map;
 
 /**
@@ -83,4 +84,76 @@ function associate(callable $keySelector): Aggregator
 function combine(Aggregator ...$aggregators): Aggregator
 {
     return Aggregator::combineBuiltIn($aggregators);
+}
+
+/**
+ * Defines an aggregation that maps every input value and collects the results in input order.
+ * Each execution creates a fresh Collection; empty input returns an empty Collection.
+ *
+ * @template T
+ * @template U
+ * @param callable(T): U $mapper
+ * @return Aggregator<T, Collection<U>>
+ */
+function mapping(callable $mapper): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::mapping($mapper));
+}
+
+/**
+ * Defines an aggregation that collects values whose predicate result is truthy.
+ * PHP runtime truthiness is used while the callable contract remains bool.
+ *
+ * @template T
+ * @param callable(T): bool $predicate
+ * @return Aggregator<T, Collection<T>>
+ */
+function filtering(callable $predicate): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::filtering($predicate));
+}
+
+/**
+ * Defines an aggregation that flattens each mapped iterable into one Collection.
+ * Outer and inner order are preserved, and iterable keys are discarded.
+ *
+ * @template T
+ * @template U
+ * @param callable(T): iterable<U> $mapper
+ * @return Aggregator<T, Collection<U>>
+ * @mago-expect lint:function-name
+ */
+function flatMapping(callable $mapper): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::flatMapping($mapper));
+}
+
+/**
+ * Defines an aggregation that collects each updated state without emitting the seed.
+ * Seed values are not cloned, so object seeds retain normal PHP reference semantics.
+ *
+ * @template T
+ * @template S
+ * @param S $initial
+ * @param callable(S, T): S $step
+ * @return Aggregator<T, Collection<S>>
+ */
+function scanning(mixed $initial, callable $step): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::scanning($initial, $step));
+}
+
+/**
+ * Defines a left-fold aggregation. Empty input returns the initial value.
+ * Seed values are not cloned, so object seeds retain normal PHP reference semantics.
+ *
+ * @template T
+ * @template S
+ * @param S $initial
+ * @param callable(S, T): S $step
+ * @return Aggregator<T, S>
+ */
+function folding(mixed $initial, callable $step): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::folding($initial, $step));
 }

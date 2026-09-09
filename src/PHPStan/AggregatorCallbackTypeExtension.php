@@ -11,7 +11,10 @@ use PHPStan\Reflection\ParameterReflection;
 use PHPStan\Type\BooleanType;
 use PHPStan\Type\ClosureType;
 use PHPStan\Type\FunctionParameterClosureTypeExtension;
+use PHPStan\Type\GeneralizePrecision;
 use PHPStan\Type\IntegerType;
+use PHPStan\Type\IterableType;
+use PHPStan\Type\MixedType;
 use PHPStan\Type\StringType;
 use PHPStan\Type\Type;
 use PHPStan\Type\TypeCombinator;
@@ -22,12 +25,26 @@ final class AggregatorCallbackTypeExtension implements FunctionParameterClosureT
         'Itera\\Aggregator\\all' => true,
         'Itera\\Aggregator\\any' => true,
         'Itera\\Aggregator\\associate' => true,
+        'Itera\\Aggregator\\filtering' => true,
+        'Itera\\Aggregator\\flatMapping' => true,
+        'Itera\\Aggregator\\folding' => true,
+        'Itera\\Aggregator\\mapping' => true,
+        'Itera\\Aggregator\\scanning' => true,
         'Itera\\Pipe\\associate' => true,
     ];
 
     public function isFunctionSupported(FunctionReflection $functionReflection, ParameterReflection $parameter): bool
     {
-        return array_key_exists($functionReflection->getName(), self::FUNCTIONS);
+        $name = $functionReflection->getName();
+
+        return (
+            array_key_exists($name, self::FUNCTIONS)
+            && (
+                $name !== 'Itera\\Aggregator\\scanning'
+                && $name !== 'Itera\\Aggregator\\folding'
+                || $parameter->getName() === 'step'
+            )
+        );
     }
 
     public function getTypeFromFunctionCall(
@@ -36,17 +53,34 @@ final class AggregatorCallbackTypeExtension implements FunctionParameterClosureT
         ParameterReflection $parameter,
         Scope $scope,
     ): ?Type {
-        $inputType = AggregatorCallContext::inputType($functionCall, $scope);
+        $name = $functionReflection->getName();
+        $stateful = $name === 'Itera\\Aggregator\\scanning' || $name === 'Itera\\Aggregator\\folding';
+        $inputType = AggregatorCallContext::callbackInputType(
+            $functionCall,
+            $scope,
+            $stateful ? 1 : 0,
+            $stateful ? 1 : 0,
+        );
         if ($inputType === null) {
             return null;
         }
 
-        $returnType = str_ends_with($functionReflection->getName(), '\\associate')
-            ? TypeCombinator::union(new IntegerType(), new StringType())
-            : new BooleanType();
+        $stateType = $stateful
+            ? $scope->getType($functionCall->getArgs()[0]->value)->generalize(GeneralizePrecision::lessSpecific())
+            : new MixedType();
+        $returnType = match ($name) {
+            'Itera\\Aggregator\\associate' => TypeCombinator::union(new IntegerType(), new StringType()),
+            'Itera\\Pipe\\associate' => TypeCombinator::union(new IntegerType(), new StringType()),
+            'Itera\\Aggregator\\all', 'Itera\\Aggregator\\any', 'Itera\\Aggregator\\filtering' => new BooleanType(),
+            'Itera\\Aggregator\\flatMapping' => new IterableType(new MixedType(), new MixedType()),
+            'Itera\\Aggregator\\folding', 'Itera\\Aggregator\\scanning' => $stateType,
+            default => new MixedType(),
+        };
 
-        return new ClosureType([
-            new AggregatorClosureParameter($inputType),
-        ], $returnType);
+        $parameters = $stateful
+            ? [new AggregatorClosureParameter($stateType), new AggregatorClosureParameter($inputType)]
+            : [new AggregatorClosureParameter($inputType)];
+
+        return new ClosureType($parameters, $returnType);
     }
 }

@@ -97,7 +97,7 @@ $chunks = Sequence::from([1, 2, 3, 4, 5])
 
 ### Aggregator
 
-`Aggregator<T, R>` は `Sequence<T>` の出力を `R` に集約する、再利用可能な定義です。`Itera\Aggregator` 名前空間には `count()`、`any($predicate)`、`all($predicate)`、`collect()`、`associate($keySelector)`、`combine(...$aggregators)` があります。公開された `AggregatorExecution<T, R>` を実装する実行 factory は `Aggregator::custom()` で定義できます。定義を作った時点では source、predicate、key selector、custom factory を実行せず、`Sequence::aggregate()` に渡した時点でその Sequence を消費します。同じ定義を別の Sequence に再利用でき、実行ごとの状態や materialized な結果は共有されません。
+`Aggregator<T, R>` は `Sequence<T>` の出力を `R` に集約する、再利用可能な定義です。`Itera\Aggregator` 名前空間には `count()`、`any($predicate)`、`all($predicate)`、`collect()`、`associate($keySelector)`、`mapping($mapper)`、`filtering($predicate)`、`flatMapping($mapper)`、`scanning($initial, $step)`、`folding($initial, $step)`、`combine(...$aggregators)` があります。公開された `AggregatorExecution<T, R>` を実装する実行 factory は `Aggregator::custom()` で定義できます。定義を作った時点では source、callback、custom factory を実行せず、`Sequence::aggregate()` に渡した時点でその Sequence を消費します。同じ定義を別の Sequence に再利用でき、実行ごとの状態や materialized な結果は共有されません。
 
 custom execution は一回の集約の可変状態を保持し、未完了の間だけ `advance()` で値を受け取り、`isComplete()` で早期終了を示し、`finish()` で結果を返します。`isComplete()` は繰り返し問い合わせられ、完了後に未完了へ戻してはいけません。正常経路では `finish()` が一度呼ばれますが、例外時の cleanup hook ではありません。
 
@@ -143,6 +143,12 @@ $summary = Sequence::from([1, 2, 3])->aggregate(combine(average: $average, count
 ```
 
 `count()` は空で `0`、`any()` は空で `false`、`all()` は空で `true` を返します。`any()` は最初の truthy、`all()` は最初の falsy で読み取りを止めます。`collect()` は毎回新しい `Collection` を作り、`associate()` は毎回新しい `Map` を作ります。`associate()` の重複 key は後勝ちです。`count()`、`collect()`、`associate()` は有限な出力を必要とします。
+
+`mapping()` は変換結果、`filtering()` は predicate が truthy になった元の値、`flatMapping()` は各 mapper が返す iterable の値を、入力順に新しい `Collection` へ格納します。`flatMapping()` は内側 iterable の key を捨て、外側と内側の順序を保ちます。いずれも空入力では空の `Collection` を返します。内側 iterable が無限の場合、`flatMapping()` はその入力値の処理から戻りません。
+
+`scanning()` は入力ごとの更新後 state を `Collection` に格納し、seed 自体は出力しません。空入力では空の `Collection` を返します。`folding()` は最終 state を返し、空入力では initial を返します。initial は複製されないため、object seed と各 scan 結果には通常の PHP の参照共有が適用されます。各 Aggregator の進行状態と結果コンテナは実行ごと、また `combine()` の枝ごとに新しく作られ、変換は指定した枝の結果にだけ適用されます。
+
+これら5関数はすべて入力を最後まで消費するため、無限入力では完了しません。
 
 ```php
 use function Itera\Aggregator\{

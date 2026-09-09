@@ -17,6 +17,12 @@ use function Itera\Aggregator\collect;
 use function Itera\Aggregator\combine;
 use function Itera\Aggregator\combine as combineAlias;
 use function Itera\Aggregator\count;
+use function Itera\Aggregator\filtering;
+use function Itera\Aggregator\flatMapping;
+use function Itera\Aggregator\folding;
+use function Itera\Aggregator\mapping;
+use function Itera\Aggregator\mapping as mappingAlias;
+use function Itera\Aggregator\scanning;
 use function PHPStan\Testing\assertType;
 
 /** @mago-expect lint:too-many-methods */
@@ -49,6 +55,84 @@ final class AggregatorTypeTest extends TypeInferenceTestCase
         }
 
         self::assertTrue($matched);
+    }
+
+    public function testTransformingFactoriesInferCallbackInputsAndResults(): void
+    {
+        $users = [new AggregatorTypeUser(1, true)];
+        $mapped = Sequence::from($users)->aggregate(mapping(static fn($user) => $user->id));
+        $aliased = Sequence::from($users)->aggregate(mappingAlias(static fn($user) => (string) $user->id));
+        $filtered = Sequence::from($users)->aggregate(filtering(static fn($user) => $user->active));
+        $flattened = Sequence::from($users)->aggregate(flatMapping(static fn($user) => [$user->id]));
+        $scanned = Sequence::from($users)->aggregate(scanning(0, static fn($state, $user) => $state + $user->id));
+        $folded = Sequence::from($users)->aggregate(folding('', static fn($state, $user) => $state . $user->id));
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Collection<int>', $mapped);
+            assertType('Itera\\Collection<decimal-int-string>', $aliased);
+            assertType('Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>', $filtered);
+            assertType('Itera\\Collection<int>', $flattened);
+            assertType('Itera\\Collection<int>', $scanned);
+            assertType('string', $folded);
+        }
+
+        self::assertSame([1], $mapped->values());
+    }
+
+    /**
+     * @mago-expect lint:prefer-arrow-function
+     * @mago-expect lint:inline-variable-return
+     */
+    public function testTransformingFactoriesInferOrdinaryClosureResults(): void
+    {
+        $users = [new AggregatorTypeUser(1, true)];
+        $mapped = Sequence::from($users)->aggregate(mapping(static function ($user) {
+            return $user->id;
+        }));
+        $flattened = Sequence::from($users)->aggregate(flatMapping(static function ($user) {
+            return [$user->id];
+        }));
+        $mappedThroughLocal = Sequence::from($users)->aggregate(mapping(static function ($user) {
+            $id = $user->id;
+
+            return $id;
+        }));
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Collection<int>', $mapped);
+            assertType('Itera\\Collection<int>', $flattened);
+            assertType('Itera\\Collection<int>', $mappedThroughLocal);
+        }
+
+        self::assertSame([1], $mapped->values());
+        self::assertSame([1], $flattened->values());
+        self::assertSame([1], $mappedThroughLocal->values());
+    }
+
+    public function testSavedTransformingDefinitionsAndCombinedBranchesKeepTheirTypes(): void
+    {
+        $mapping = mapping(static fn(AggregatorTypeUser $user): int => $user->id);
+        $filtering = filtering(static fn(AggregatorTypeUser $user): bool => $user->active);
+        $flatMapping = flatMapping(static fn(AggregatorTypeUser $user): iterable => [$user->id]);
+        $scanning = scanning(0, static fn(int $state, AggregatorTypeUser $user): int => $state + $user->id);
+        $folding = folding('', static fn(string $state, AggregatorTypeUser $user): string => $state . $user->id);
+        $result = Sequence::from([new AggregatorTypeUser(1, true)])->aggregate(combine(
+            mapped: $mapping,
+            filtered: $filtering,
+            flattened: $flatMapping,
+            scanned: $scanning,
+            folded: $folding,
+        ));
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Aggregator<Itera\\Tests\\AggregatorTypeUser, Itera\\Collection<int>>', $mapping);
+            assertType(
+                'array{mapped: Itera\\Collection<int>, filtered: Itera\\Collection<Itera\\Tests\\AggregatorTypeUser>, flattened: Itera\\Collection<int>, scanned: Itera\\Collection<int>, folded: string}',
+                $result,
+            );
+        }
+
+        self::assertSame('1', $result['folded']);
     }
 
     public function testCombinedChildrenPreserveNamesAndHeterogeneousResults(): void
