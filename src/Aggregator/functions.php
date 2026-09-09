@@ -157,3 +157,82 @@ function folding(mixed $initial, callable $step): Aggregator
 {
     return Aggregator::custom(AggregatorBuiltIns::folding($initial, $step));
 }
+
+/**
+ * Defines an aggregation that adds numeric values using PHP arithmetic.
+ * Empty input returns integer zero; native float, infinity, NaN, and overflow behavior is preserved.
+ *
+ * @return Aggregator<int|float, int|float>
+ */
+function sum(): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::sum());
+}
+
+/**
+ * Defines an aggregation that returns the smallest numeric value, or null for empty input.
+ * PHP comparison semantics are used, and the first value is retained when values compare equal.
+ *
+ * @return Aggregator<int|float, int|float|null>
+ */
+function min(): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::min());
+}
+
+/**
+ * Defines an aggregation that returns the largest numeric value, or null for empty input.
+ * PHP comparison semantics are used, and the first value is retained when values compare equal.
+ *
+ * @return Aggregator<int|float, int|float|null>
+ */
+function max(): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::max());
+}
+
+/**
+ * Defines an aggregation that returns the arithmetic mean as a float, or null for empty input.
+ * Values are added and divided with native PHP numeric semantics.
+ *
+ * @return Aggregator<int|float, float|null>
+ */
+function average(): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::average());
+}
+
+/**
+ * Defines an aggregation that returns the first value with a truthy predicate result.
+ * It stops after the first match and returns null when no value matches.
+ *
+ * @template T
+ * @param callable(T): bool $predicate
+ * @return Aggregator<T, T|null>
+ */
+function find(callable $predicate): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::find($predicate));
+}
+
+/**
+ * Defines an aggregation that returns the first value, including null, then stops.
+ * Empty input returns null.
+ *
+ * @return Aggregator<mixed, mixed>
+ */
+function first(): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::first());
+}
+
+/**
+ * Defines an aggregation that joins strings with a separator between every pair of elements.
+ * Empty input returns an empty string, and empty string elements still occupy a position.
+ *
+ * @return Aggregator<string, string>
+ */
+function join(string $separator): Aggregator
+{
+    return Aggregator::custom(AggregatorBuiltIns::join($separator));
+}

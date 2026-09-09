@@ -12,6 +12,7 @@ use PHPStan\Reflection\MethodReflection;
 use PHPStan\Type\DynamicMethodReturnTypeExtension;
 use PHPStan\Type\Generic\GenericObjectType;
 use PHPStan\Type\Type;
+use PHPStan\Type\TypeCombinator;
 
 final class SequenceAggregateReturnTypeExtension implements DynamicMethodReturnTypeExtension
 {
@@ -39,6 +40,9 @@ final class SequenceAggregateReturnTypeExtension implements DynamicMethodReturnT
         $aggregatorType = $scope->getType($argument->value);
         if ($aggregatorType instanceof CombinedAggregatorType) {
             return AggregatorTypeResolver::resultType($aggregatorType->getChildrenType(), $elementType);
+        }
+        if ($aggregatorType instanceof FirstAggregatorType) {
+            return TypeCombinator::addNull($elementType);
         }
         if (!$aggregatorType instanceof CollectAggregatorType) {
             return null;

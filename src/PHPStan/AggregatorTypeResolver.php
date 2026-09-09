@@ -103,6 +103,9 @@ final class AggregatorTypeResolver
         if ($childType instanceof CollectAggregatorType) {
             return new GenericObjectType(Collection::class, [$executionInputType]);
         }
+        if ($childType instanceof FirstAggregatorType) {
+            return TypeCombinator::addNull($executionInputType);
+        }
 
         return $childType->getTemplateType(Aggregator::class, 'R');
     }

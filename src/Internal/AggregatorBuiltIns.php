@@ -8,7 +8,10 @@ use Closure;
 use Itera\Collection;
 use Itera\Map;
 
-/** @internal */
+/**
+ * @internal
+ * @mago-expect lint:too-many-methods
+ */
 final class AggregatorBuiltIns
 {
     /** @return Closure(): AggregatorExecution<mixed, int> */
@@ -242,5 +245,138 @@ final class AggregatorBuiltIns
         };
 
         return $executionFactory;
+    }
+
+    /** @return Closure(): AggregatorExecution<int|float, int|float> */
+    public static function sum(): Closure
+    {
+        return static function (): AggregatorExecution {
+            $state = new AggregatorNumericState();
+
+            return new AggregatorExecution(
+                static function (int|float $value) use ($state): bool {
+                    $state->sum += $value;
+
+                    return false;
+                },
+                static fn(): int|float => $state->sum,
+            );
+        };
+    }
+
+    /** @return Closure(): AggregatorExecution<int|float, int|float|null> */
+    public static function min(): Closure
+    {
+        return self::numericExtreme(static fn(int|float $value, int|float $current): bool => $value < $current);
+    }
+
+    /** @return Closure(): AggregatorExecution<int|float, int|float|null> */
+    public static function max(): Closure
+    {
+        return self::numericExtreme(static fn(int|float $value, int|float $current): bool => $value > $current);
+    }
+
+    /** @return Closure(): AggregatorExecution<int|float, float|null> */
+    public static function average(): Closure
+    {
+        return static function (): AggregatorExecution {
+            $state = new AggregatorNumericState();
+
+            return new AggregatorExecution(
+                static function (int|float $value) use ($state): bool {
+                    $state->sum += $value;
+                    ++$state->count;
+
+                    return false;
+                },
+                static fn(): ?float => $state->count === 0 ? null : $state->sum / $state->count,
+            );
+        };
+    }
+
+    /**
+     * @template T
+     * @param callable(T): bool $predicate
+     * @return Closure(): AggregatorExecution<T, T|null>
+     * @mago-expect lint:inline-variable-return
+     */
+    public static function find(callable $predicate): Closure
+    {
+        /** @var Closure(): AggregatorExecution<T, T|null> $executionFactory */
+        $executionFactory = static function () use ($predicate): AggregatorExecution {
+            $matched = null;
+
+            return new AggregatorExecution(static function (mixed $value) use ($predicate, &$matched): bool {
+                if (!$predicate($value)) {
+                    return false;
+                }
+
+                $matched = $value;
+
+                return true;
+            }, static function () use (&$matched): mixed {
+                return $matched;
+            });
+        };
+
+        return $executionFactory;
+    }
+
+    /** @return Closure(): AggregatorExecution<mixed, mixed> */
+    public static function first(): Closure
+    {
+        return static function (): AggregatorExecution {
+            $first = null;
+
+            return new AggregatorExecution(static function (mixed $value) use (&$first): bool {
+                $first = $value;
+
+                return true;
+            }, static function () use (&$first): mixed {
+                return $first;
+            });
+        };
+    }
+
+    /** @return Closure(): AggregatorExecution<string, string> */
+    public static function join(string $separator): Closure
+    {
+        return static function () use ($separator): AggregatorExecution {
+            $joined = '';
+            $first = true;
+
+            return new AggregatorExecution(static function (string $value) use ($separator, &$joined, &$first): bool {
+                if (!$first) {
+                    $joined .= $separator;
+                }
+                $joined .= $value;
+                $first = false;
+
+                return false;
+            }, static function () use (&$joined): string {
+                return $joined;
+            });
+        };
+    }
+
+    /**
+     * @param Closure(int|float, int|float): bool $better
+     * @return Closure(): AggregatorExecution<int|float, int|float|null>
+     */
+    private static function numericExtreme(Closure $better): Closure
+    {
+        return static function () use ($better): AggregatorExecution {
+            $current = null;
+
+            return new AggregatorExecution(static function (int|float $value) use ($better, &$current): bool {
+                if ($current === null || $better($value, $current)) {
+                    $current = $value;
+                }
+
+                return false;
+            }, static function () use (&$current): int|float|null {
+                return $current;
+            });
+        };
     }
 }

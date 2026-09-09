@@ -16,6 +16,7 @@ use PHPStan\Type\DynamicFunctionReturnTypeExtension;
 use PHPStan\Type\GeneralizePrecision;
 use PHPStan\Type\Generic\GenericObjectType;
 use PHPStan\Type\Type;
+use PHPStan\Type\TypeCombinator;
 
 final class AggregatorFunctionReturnTypeExtension implements DynamicFunctionReturnTypeExtension
 {
@@ -24,6 +25,8 @@ final class AggregatorFunctionReturnTypeExtension implements DynamicFunctionRetu
         'Itera\\Aggregator\\any' => true,
         'Itera\\Aggregator\\associate' => true,
         'Itera\\Aggregator\\filtering' => true,
+        'Itera\\Aggregator\\find' => true,
+        'Itera\\Aggregator\\first' => true,
         'Itera\\Aggregator\\flatMapping' => true,
         'Itera\\Aggregator\\folding' => true,
         'Itera\\Aggregator\\mapping' => true,
@@ -45,6 +48,9 @@ final class AggregatorFunctionReturnTypeExtension implements DynamicFunctionRetu
         Scope $scope,
     ): ?Type {
         $name = $functionReflection->getName();
+        if ($name === 'Itera\\Aggregator\\first') {
+            return new FirstAggregatorType();
+        }
         $stateful = $name === 'Itera\\Aggregator\\scanning' || $name === 'Itera\\Aggregator\\folding';
         $inputType = AggregatorCallContext::callbackInputType(
             $functionCall,
@@ -65,6 +71,10 @@ final class AggregatorFunctionReturnTypeExtension implements DynamicFunctionRetu
                 $inputType,
                 new GenericObjectType(Collection::class, [$inputType]),
             ]);
+        }
+
+        if ($name === 'Itera\\Aggregator\\find') {
+            return new GenericObjectType(Aggregator::class, [$inputType, TypeCombinator::addNull($inputType)]);
         }
 
         if ($stateful) {

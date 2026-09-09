@@ -13,19 +13,29 @@ use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use function Itera\Aggregator\all;
 use function Itera\Aggregator\any;
 use function Itera\Aggregator\associate;
+use function Itera\Aggregator\average;
 use function Itera\Aggregator\collect;
 use function Itera\Aggregator\combine;
 use function Itera\Aggregator\combine as combineAlias;
 use function Itera\Aggregator\count;
 use function Itera\Aggregator\filtering;
+use function Itera\Aggregator\find;
+use function Itera\Aggregator\first;
 use function Itera\Aggregator\flatMapping;
 use function Itera\Aggregator\folding;
+use function Itera\Aggregator\join;
 use function Itera\Aggregator\mapping;
 use function Itera\Aggregator\mapping as mappingAlias;
+use function Itera\Aggregator\max;
+use function Itera\Aggregator\min;
 use function Itera\Aggregator\scanning;
+use function Itera\Aggregator\sum;
 use function PHPStan\Testing\assertType;
 
-/** @mago-expect lint:too-many-methods */
+/**
+ * @mago-expect lint:cyclomatic-complexity
+ * @mago-expect lint:too-many-methods
+ */
 final class AggregatorTypeTest extends TypeInferenceTestCase
 {
     /** @return list<string> */
@@ -77,6 +87,38 @@ final class AggregatorTypeTest extends TypeInferenceTestCase
         }
 
         self::assertSame([1], $mapped->values());
+    }
+
+    public function testNumericSearchAndStringAggregatorsInferInputsAndResults(): void
+    {
+        $user = new AggregatorTypeUser(1, true);
+        $found = Sequence::from([$user])->aggregate(find(static fn($value) => $value->active));
+        $first = Sequence::from([$user])->aggregate(first());
+        $storedFirst = first();
+        $stored = Sequence::from([$user])->aggregate($storedFirst);
+        $combined = Sequence::from([$user])->aggregate(combine(found: find(static fn($value) => true), first: first()));
+        $numeric = Sequence::from([1, 2])->aggregate(combine(sum: sum(), min: min(), max: max(), average: average()));
+        $joined = Sequence::from(['a', 'b'])->aggregate(join(','));
+        $savedSum = sum();
+        $savedNumeric = Sequence::from([1.0])->aggregate($savedSum);
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Tests\\AggregatorTypeUser|null', $found);
+            assertType('Itera\\Tests\\AggregatorTypeUser|null', $first);
+            assertType('Itera\\Tests\\AggregatorTypeUser|null', $stored);
+            assertType(
+                'array{found: Itera\\Tests\\AggregatorTypeUser|null, first: Itera\\Tests\\AggregatorTypeUser|null}',
+                $combined,
+            );
+            assertType(
+                'array{sum: float|int, min: float|int|null, max: float|int|null, average: float|null}',
+                $numeric,
+            );
+            assertType('string', $joined);
+            assertType('float|int', $savedNumeric);
+        }
+
+        self::assertSame($user, $first);
     }
 
     /**

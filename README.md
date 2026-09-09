@@ -97,7 +97,7 @@ $chunks = Sequence::from([1, 2, 3, 4, 5])
 
 ### Aggregator
 
-`Aggregator<T, R>` は `Sequence<T>` の出力を `R` に集約する、再利用可能な定義です。`Itera\Aggregator` 名前空間には `count()`、`any($predicate)`、`all($predicate)`、`collect()`、`associate($keySelector)`、`mapping($mapper)`、`filtering($predicate)`、`flatMapping($mapper)`、`scanning($initial, $step)`、`folding($initial, $step)`、`combine(...$aggregators)` があります。公開された `AggregatorExecution<T, R>` を実装する実行 factory は `Aggregator::custom()` で定義できます。定義を作った時点では source、callback、custom factory を実行せず、`Sequence::aggregate()` に渡した時点でその Sequence を消費します。同じ定義を別の Sequence に再利用でき、実行ごとの状態や materialized な結果は共有されません。
+`Aggregator<T, R>` は `Sequence<T>` の出力を `R` に集約する、再利用可能な定義です。`Itera\Aggregator` 名前空間には `count()`、`any($predicate)`、`all($predicate)`、`collect()`、`associate($keySelector)`、`mapping($mapper)`、`filtering($predicate)`、`flatMapping($mapper)`、`scanning($initial, $step)`、`folding($initial, $step)`、`sum()`、`min()`、`max()`、`average()`、`find($predicate)`、`first()`、`join($separator)`、`combine(...$aggregators)` があります。公開された `AggregatorExecution<T, R>` を実装する実行 factory は `Aggregator::custom()` で定義できます。定義を作った時点では source、callback、custom factory を実行せず、`Sequence::aggregate()` に渡した時点でその Sequence を消費します。同じ定義を別の Sequence に再利用でき、実行ごとの状態や materialized な結果は共有されません。
 
 custom execution は一回の集約の可変状態を保持し、未完了の間だけ `advance()` で値を受け取り、`isComplete()` で早期終了を示し、`finish()` で結果を返します。`isComplete()` は繰り返し問い合わせられ、完了後に未完了へ戻してはいけません。正常経路では `finish()` が一度呼ばれますが、例外時の cleanup hook ではありません。
 
@@ -149,6 +149,12 @@ $summary = Sequence::from([1, 2, 3])->aggregate(combine(average: $average, count
 `scanning()` は入力ごとの更新後 state を `Collection` に格納し、seed 自体は出力しません。空入力では空の `Collection` を返します。`folding()` は最終 state を返し、空入力では initial を返します。initial は複製されないため、object seed と各 scan 結果には通常の PHP の参照共有が適用されます。各 Aggregator の進行状態と結果コンテナは実行ごと、また `combine()` の枝ごとに新しく作られ、変換は指定した枝の結果にだけ適用されます。
 
 これら5関数はすべて入力を最後まで消費するため、無限入力では完了しません。
+
+`sum()` は数値を PHP の加算で集約し、空入力では整数の `0` を返します。`min()` と `max()` は空入力では `null`、それ以外では PHP の `<` と `>` で更新した値を返し、同値なら最初の値とその数値型を保ちます。`average()` は空入力では `null`、それ以外では float の平均を返します。4関数は `int|float` だけを受け付け、NaN、無限大、整数オーバーフローを含む演算結果は PHP のネイティブ動作に従います。いずれも有限な入力を最後まで消費します。
+
+`find($predicate)` は predicate が最初に truthy になった値を返し、`first()` は `null` を含む最初の値を返します。一致または先頭値を得た直後に source の読み取りを止め、結果がない場合は `null` を返します。`combine()` では完了した枝への配信だけが止まり、全件集約する兄弟枝があれば source の終端まで処理を続けます。すべての枝が完了すれば合成全体も停止します。
+
+`join($separator)` は string 値の間だけ separator を挿入し、空入力では空文字列を返します。空文字列の要素も1要素として扱うため、`['', 'a', '']` を `'|'` で結合した結果は `'|a|'` です。入力を最後まで消費するため、無限入力では完了しません。
 
 ```php
 use function Itera\Aggregator\{

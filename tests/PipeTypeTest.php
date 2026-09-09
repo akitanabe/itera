@@ -14,7 +14,9 @@ use function Itera\Aggregator\associate as associateWith;
 use function Itera\Aggregator\collect as collectWith;
 use function Itera\Aggregator\combine as combineWith;
 use function Itera\Aggregator\count as countWith;
+use function Itera\Aggregator\first as firstWith;
 use function Itera\Aggregator\mapping as mappingWith;
+use function Itera\Aggregator\sum as sumWith;
 use function Itera\Pipe\aggregate;
 use function Itera\Pipe\associate;
 use function Itera\Pipe\chunk;
@@ -246,6 +248,20 @@ final class PipeTypeTest extends TypeInferenceTestCase
 
         self::assertSame([1], $direct->values());
         self::assertSame([2], $stored->values());
+    }
+
+    public function testSavedFirstAggregatorSpecializesToThePipeSequenceElementType(): void
+    {
+        $saved = aggregate(firstWith());
+        $result = [new PipeTypeUser(1, true)] |> sequence() |> $saved;
+        $sum = [1, 2] |> sequence() |> aggregate(sumWith());
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Tests\\PipeTypeUser|null', $result);
+            assertType('float|int', $sum);
+        }
+
+        self::assertInstanceOf(PipeTypeUser::class, $result);
     }
 
     public function testCustomAggregatorPreservesItsTypeThroughPipeAggregate(): void
