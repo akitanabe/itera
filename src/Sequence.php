@@ -87,6 +87,30 @@ final class Sequence implements IteratorAggregate
     }
 
     /**
+     * Creates a fresh sequence that lazily emits each input in declaration
+     * order. Inputs remain independently mutable until the concatenation
+     * reaches them during consumption.
+     *
+     * @template U
+     * @param Sequence<U> $first
+     * @param Sequence<U> ...$rest
+     * @return Sequence<U>
+     */
+    public static function concat(self $first, self ...$rest): self
+    {
+        $inputs = [$first, ...$rest];
+
+        /** @return Generator<int, U, void, void> */
+        $source = static function () use ($inputs): Generator {
+            foreach ($inputs as $input) {
+                yield from $input;
+            }
+        };
+
+        return self::from($source());
+    }
+
+    /**
      * Lazily replaces each value and returns this same mutable sequence.
      *
      * Static analysis updates the type of the receiver. References that alias

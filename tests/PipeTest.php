@@ -19,6 +19,7 @@ use function Itera\Pipe\aggregate;
 use function Itera\Pipe\associate;
 use function Itera\Pipe\chunk;
 use function Itera\Pipe\collect;
+use function Itera\Pipe\concat;
 use function Itera\Pipe\drop;
 use function Itera\Pipe\filter;
 use function Itera\Pipe\flatMap;
@@ -35,6 +36,29 @@ use function Itera\Pipe\until;
 /** @mago-expect lint:too-many-methods */
 final class PipeTest extends TestCase
 {
+    public function testConcatComposerDirectlyReturnsALazySequence(): void
+    {
+        $events = [];
+        $input = Sequence::from(self::recordingIntegers($events, 1));
+
+        $result = concat($input);
+        $result->map(static fn(int $value): int => $value * 10);
+
+        self::assertInstanceOf(Sequence::class, $result);
+        self::assertSame([], $events);
+        self::assertSame([1], $input->collect()->values());
+
+        try {
+            $result->collect();
+            self::fail('The independently consumed input was not rejected.');
+        } catch (SequenceConsumedException $exception) {
+            self::assertInstanceOf(SequenceConsumedException::class, $exception);
+        }
+
+        $this->assertConsumed($result);
+        self::assertSame([1], $events);
+    }
+
     public function testPipeTransformsAnIterableIntoACollectionThroughProductionAutoload(): void
     {
         $result = self::integers(1, 2)

@@ -21,6 +21,17 @@ function sequence(): Closure
 
 /**
  * @template T
+ * @param Sequence<T> $first
+ * @param Sequence<T> ...$rest
+ * @return Sequence<T>
+ */
+function concat(Sequence $first, Sequence ...$rest): Sequence
+{
+    return Sequence::concat($first, ...$rest);
+}
+
+/**
+ * @template T
  * @template U
  * @param callable(T): U $mapper
  * @return Closure(Sequence<T>): Sequence<U>

@@ -49,6 +49,19 @@ $result = Sequence::from($users)
     ->collect();
 ```
 
+`Sequence::concat($first, ...$rest)` は、入力を宣言した順に遅延して連結した新しい `Sequence` を作ります。入力の iterator 解決、値の読み取り、pipeline は消費時まで始まりません。合成の `getIterator()` を取得するだけでは入力を開始せず、`take(0)->collect()` も入力を読みません（どちらも合成自身は使用済みになります）。入力は配列へコピーされず、各入力に登録した操作と値の参照を保ったまま、前の入力が終わった時点で次の入力を開始します。入力が一つの場合も新しい `Sequence` を返します。
+
+```php
+$values = Sequence::concat(
+    Sequence::from([1, 2]),
+    Sequence::from([3]),
+)->collect()->values(); // [1, 2, 3]
+```
+
+連結後の `map()`、`until()`、`flatMap()`、`chunk()` は連結された出力へ適用されます。入力側の `chunk()` は各入力の境界を保ち、連結後の `chunk()` は入力境界をまたいで値をまとめます。入力は構築後に登録された操作や独立した消費の影響を受け、合成がその入力へ到達した時点の状態が使われます。`take()` や `until()` で途中停止した場合、開始済みの連結と入力は使用済みになり、まだ到達していない入力は独立して消費できます。無限入力を先頭に置く場合、その入力自身を `take()` や `until()` で有限化しない限り後続入力へ到達せず、合成の下流停止でも後続入力は開始しません。
+
+`Itera\Pipe\concat($first, ...$rest)` は Closure factory ではなく、`Sequence::concat()` へ直接委譲する composer です。
+
 `scan($initial, $step)` は seed を出力せず、入力ごとに `step($state, $value)` を一度実行して、その戻り値を次の state と出力にします。state の型が Sequence の要素型になり、登録時には source や step を実行しません。
 
 ```php
@@ -231,7 +244,7 @@ PHP 8.5 の pipe operator では、`Itera\Pipe` の factory を使って `Sequen
 
 ```php
 use function Itera\Aggregator\collect as collectWith;
-use function Itera\Pipe\{aggregate, collect as collectPipe, filter, map, sequence, take};
+use function Itera\Pipe\{aggregate, collect as collectPipe, concat, filter, map, sequence, take};
 
 $names = $users
     |> sequence()
@@ -243,9 +256,20 @@ $names = $users
 $usersCollection = $users
     |> sequence()
     |> aggregate(collectWith());
+
+$combined = concat(
+    [1, 2] |> sequence(),
+    [3] |> sequence(),
+)
+    |> map(fn (int $value): int => $value * 10)
+    |> collectPipe();
+
+$combined->values(); // [10, 20, 30]
 ```
 
 `sequence()`、`map($mapper)`、`scan($initial, $step)`、`tap($effect)`、`chunk($size)`、`filter($predicate)`、`flatMap($mapper)`、`until($predicate)`、`skipUntil($predicate)`、`take($count)`、`drop($count)`、`collect()`、`fold($initial, $step)`、`aggregate($aggregator)`、`associate($keySelector)`、`getIterator()` は、それぞれ単一の入力を受け取る `Closure` を返します。factory の作成時には source や callback を実行せず、`chunk()`、`take()`、`drop()` の引数検証も行いません。返した Closure を `Sequence` に適用した時点で対応するメソッドを直接呼ぶため、引数や消費済み入力の拒否はその適用時に発生します。
+
+`concat($first, ...$rest)` は入力 `Sequence` を受け取って直接 `Sequence` を返すため、返された値へ通常の `|>` で `map()` や `collect()` を続けられます。
 
 中間操作は同じ mutable な `Sequence` を返し、source と callback の実行は終端処理まで遅延されます。`collect()`、`fold()`、`aggregate()`、`associate()` は適用時に消費し、`getIterator()` も適用した時点で Sequence を使用済みにします。各 Sequence は一度だけ消費できます。全件を読む終端処理には有限な出力が必要です。
 

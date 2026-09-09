@@ -23,6 +23,7 @@ use function Itera\Pipe\aggregate;
 use function Itera\Pipe\associate;
 use function Itera\Pipe\chunk;
 use function Itera\Pipe\collect;
+use function Itera\Pipe\concat;
 use function Itera\Pipe\drop;
 use function Itera\Pipe\filter;
 use function Itera\Pipe\flatMap;
@@ -68,6 +69,25 @@ final class PipeTypeTest extends TypeInferenceTestCase
         }
 
         self::assertSame(['value:1', 'value:2'], $result->values());
+    }
+
+    public function testConcatComposerPreservesTheElementTypeThroughPipeOperations(): void
+    {
+        /** @var iterable<int> $firstValues */
+        $firstValues = [1];
+        /** @var iterable<int> $secondValues */
+        $secondValues = [2];
+        $combined = concat($firstValues |> sequence(), $secondValues |> sequence());
+        $mapped = $combined |> map(static fn(int $value): string => (string) $value);
+        $result = $mapped |> collect();
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Sequence<int>', $combined);
+            assertType('Itera\\Sequence<decimal-int-string>', $mapped);
+            assertType('Itera\\Collection<decimal-int-string>', $result);
+        }
+
+        self::assertSame(['1', '2'], $result->values());
     }
 
     public function testEveryIntermediateAndTerminalTransitionKeepsItsExactType(): void

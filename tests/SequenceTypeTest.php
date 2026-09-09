@@ -56,6 +56,33 @@ final class SequenceTypeTest extends TypeInferenceTestCase
         self::assertSame([1, 2], $sequence->collect()->values());
     }
 
+    public function testConcatPreservesTheSharedElementTypeAcrossItsInputs(): void
+    {
+        $first = Sequence::from([1]);
+        $second = Sequence::from([2]);
+        $combined = Sequence::concat($first, $second);
+        $single = Sequence::concat(Sequence::from(['value']));
+        $withEmpty = Sequence::concat(Sequence::empty(), Sequence::from([3]));
+        $mappedSource = Sequence::from([1]);
+        $mappedSource->map(static fn(int $value): string => (string) $value);
+        $mappedInput = Sequence::concat($mappedSource);
+        $mapped = Sequence::concat(Sequence::from([1, 2]))->map(static fn(int $value): string => (string) $value);
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Sequence<int>', $combined);
+            assertType('Itera\\Sequence<string>', $single);
+            assertType('Itera\\Sequence<int>', $withEmpty);
+            assertType('Itera\\Sequence<decimal-int-string>', $mappedInput);
+            assertType('Itera\\Sequence<decimal-int-string>', $mapped);
+        }
+
+        self::assertSame([1, 2], $combined->collect()->values());
+        self::assertSame(['value'], $single->collect()->values());
+        self::assertSame([3], $withEmpty->collect()->values());
+        self::assertSame(['1'], $mappedInput->collect()->values());
+        self::assertSame(['1', '2'], $mapped->collect()->values());
+    }
+
     public function testUntilPreservesTheElementTypeAfterMap(): void
     {
         $sequence = Sequence::from([1, 2])->map(static fn(int $value): string => (string) $value)->until(
