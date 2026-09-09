@@ -23,6 +23,7 @@ use function Itera\Pipe\flatMap;
 use function Itera\Pipe\fold;
 use function Itera\Pipe\getIterator;
 use function Itera\Pipe\map;
+use function Itera\Pipe\scan;
 use function Itera\Pipe\sequence;
 use function Itera\Pipe\skipUntil;
 use function Itera\Pipe\take;
@@ -96,6 +97,31 @@ final class PipeTypeTest extends TypeInferenceTestCase
         self::assertSame([1.0, 2.0], $collection->values());
         self::assertSame('12', $folded);
         self::assertSame(['a', 'b'], iterator_to_array($iterator));
+    }
+
+    public function testScanInfersTheStateTypeThroughDirectAndSavedPipeClosures(): void
+    {
+        /** @var iterable<int> $values */
+        $values = [1, 2];
+        $direct = $values |> sequence() |> scan('', static fn(string $state, int $value): string => $state . $value);
+
+        $saved = scan(0.0, static fn(float $state, int $value): float => $state + $value);
+        /** @var iterable<int> $firstValues */
+        $firstValues = [1, 2];
+        /** @var iterable<int> $secondValues */
+        $secondValues = [3];
+        $first = $firstValues |> sequence() |> $saved;
+        $second = $secondValues |> sequence() |> $saved;
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Sequence<string>', $direct);
+            assertType('Itera\\Sequence<float>', $first);
+            assertType('Itera\\Sequence<float>', $second);
+        }
+
+        self::assertSame(['1', '12'], $direct->collect()->values());
+        self::assertSame([1.0, 3.0], $first->collect()->values());
+        self::assertSame([3.0], $second->collect()->values());
     }
 
     public function testSavedPolymorphicFactoriesInferEachPipeInputIndependently(): void

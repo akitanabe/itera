@@ -24,6 +24,7 @@ use function Itera\Pipe\flatMap;
 use function Itera\Pipe\fold;
 use function Itera\Pipe\getIterator;
 use function Itera\Pipe\map;
+use function Itera\Pipe\scan;
 use function Itera\Pipe\sequence;
 use function Itera\Pipe\skipUntil;
 use function Itera\Pipe\take;
@@ -48,6 +49,7 @@ final class PipeTest extends TestCase
         $factories = [
             sequence(),
             map(static fn(int $value): int => $value),
+            scan(0, static fn(int $state, int $value): int => $state + $value),
             filter(static fn(int $value): bool => $value > 0),
             flatMap(static fn(int $value): iterable => [$value]),
             until(static fn(int $value): bool => $value > 0),
@@ -98,6 +100,67 @@ final class PipeTest extends TestCase
         self::assertSame(['source', 'map:1', 'filter:10', 'map:2', 'filter:20'], $events);
 
         self::assertSame([30], (Sequence::from(self::integers(3)) |> $mapper |> collect())->values());
+    }
+
+    public function testSavedScanFactoryKeepsStateIndependentForEachSequence(): void
+    {
+        $events = [];
+        $runningTotal = scan(0, static function (int $state, int $value) use (&$events): int {
+            $events[] = $value;
+
+            return $state + $value;
+        });
+
+        self::assertSame([], $events);
+        self::assertSame([1, 3], (Sequence::from([1, 2]) |> $runningTotal |> collect())->values());
+        self::assertSame([10, 30], (Sequence::from([10, 20]) |> $runningTotal |> collect())->values());
+        self::assertSame([1, 2, 10, 20], $events);
+    }
+
+    public function testScanPipeDefersWorkUntilConsumptionAndReturnsTheSameSequence(): void
+    {
+        $events = [];
+        $source = static function () use (&$events): iterable {
+            $events[] = 'source';
+            yield 1;
+        };
+        $scan = scan(0, static function (int $state, int $value) use (&$events): int {
+            $events[] = 'step';
+
+            return $state + $value;
+        });
+        $sequence = Sequence::from($source());
+
+        $actual = $sequence |> $scan;
+
+        self::assertSame($sequence, $actual);
+        self::assertSame([], $events);
+        self::assertSame([1], ($actual |> collect())->values());
+        self::assertSame(['source', 'step'], $events);
+    }
+
+    public function testScanPipeRejectsConsumedInputAndPreservesCallbackExceptionIdentity(): void
+    {
+        $scan = scan(0, static fn(int $state, int $value): int => $state + $value);
+        $consumed = Sequence::from([1]);
+        $consumed->collect();
+
+        $this->expectExceptionFrom(static fn(): Sequence => $consumed |> $scan, SequenceConsumedException::class);
+
+        $expected = new \RuntimeException('scan failed');
+        $fails = scan(0, static function (int $state, int $value) use ($expected): int {
+            throw $expected;
+        });
+        $sequence = Sequence::from([1]);
+
+        try {
+            $sequence |> $fails |> collect();
+            self::fail('The scan exception was not thrown.');
+        } catch (\RuntimeException $actual) {
+            self::assertSame($expected, $actual);
+        }
+
+        $this->assertConsumed($sequence);
     }
 
     public function testPipelinePreservesExpansionAndBoundaryOrder(): void

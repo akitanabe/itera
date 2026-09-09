@@ -11,6 +11,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 
 use function PHPStan\Testing\assertType;
 
+/** @mago-expect lint:too-many-methods */
 final class SequenceTypeTest extends TypeInferenceTestCase
 {
     public function testInferredTypesMatchTheDeclaredExpectations(): void
@@ -79,6 +80,19 @@ final class SequenceTypeTest extends TypeInferenceTestCase
         }
 
         self::assertSame([1.0, 2.0], $sequence->collect()->values());
+    }
+
+    public function testScanUpdatesTheReceiverAndResultTypeToTheStateType(): void
+    {
+        $sequence = Sequence::from([1, 2]);
+        $same = $sequence->scan(0.0, static fn(float $state, int $value): float => $state + $value);
+
+        if (function_exists('PHPStan\\Testing\\assertType')) {
+            assertType('Itera\\Sequence<float>', $sequence);
+            assertType('Itera\\Sequence<float>', $same);
+        }
+
+        self::assertSame([1.0, 3.0], $sequence->collect()->values());
     }
 
     public function testSkipUntilPreservesTheElementType(): void

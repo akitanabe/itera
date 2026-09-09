@@ -38,7 +38,7 @@ $user = $usersById->get('u1');
 
 ### Sequence
 
-`Sequence<T>` は mutable で一度だけ消費できる遅延変換パイプラインです。`Collection` の `sequence()` または任意の `iterable` から生成できます。`map`、`filter`、`flatMap`、`until`、`skipUntil`、`take`、`drop` は同じ `Sequence` を更新し、終端処理または `foreach` が始まるまで source や callback を実行しません。
+`Sequence<T>` は mutable で一度だけ消費できる遅延変換パイプラインです。`Collection` の `sequence()` または任意の `iterable` から生成できます。`map`、`scan`、`filter`、`flatMap`、`until`、`skipUntil`、`take`、`drop` は同じ `Sequence` を更新し、終端処理または `foreach` が始まるまで source や callback を実行しません。
 
 ```php
 $result = Sequence::from($users)
@@ -49,6 +49,17 @@ $result = Sequence::from($users)
     ->collect();
 ```
 
+`scan($initial, $step)` は seed を出力せず、入力ごとに `step($state, $value)` を一度実行して、その戻り値を次の state と出力にします。state の型が Sequence の要素型になり、登録時には source や step を実行しません。
+
+```php
+$totals = Sequence::from([1, 2, 3])
+    ->scan(0, fn (int $state, int $value): int => $state + $value)
+    ->collect()
+    ->values(); // [1, 3, 6]
+```
+
+`scan()` は state を複製せず、object state には通常の PHP の参照共有が適用されます。入力が無限の場合は、`take()`、`until()` などで下流を停止できるようにします。
+
 `map()` と `filter()` の callback は値だけを受け取ります。`filter()`、`until()`、`skipUntil()` の predicate は静的には `bool` を返す契約ですが、実行時の判定は PHP の truthiness に従います。`until($predicate)` は最初に predicate が truthy と判定された値までを含めて下流へ送り、その後の upstream の読み取りを停止します。一致する値がなければ最後まで値を送ります。
 
 `skipUntil($predicate)` は最初に predicate が truthy と判定された値を含め、それ以降の値を下流へ送り、最初の一致より前の値を捨てます。一致後は predicate を呼び出さず、一致する値がなければ空になります。predicate は値だけを受け取ります。
@@ -57,7 +68,7 @@ $result = Sequence::from($users)
 
 これは破壊的な API 整理です。旧 `toArray()` と `toCollection()` は削除し、配列が必要な場合は `collect()->values()` を使います。`Sequence` から `first()`、`last()`、`contains()`、`count()`、`any()`、`all()`、`reduce()` も提供しません。値の query は `Collection` に残し、`Sequence` では pipeline primitive としての変換、境界、materialization、`fold()` を使います。
 
-どの終端処理も呼び出した時点で消費を開始します。source や callback の例外はそのまま伝播し、途中終了や例外の後を含め、消費を開始した `Sequence` は再利用できません。`map()` や `flatMap()` による同一インスタンス上の型変更は静的解析できますが、変更前に保持した別名参照の型には解析上の制限があります。
+どの終端処理も呼び出した時点で消費を開始します。source や callback の例外はそのまま伝播し、途中終了や例外の後を含め、消費を開始した `Sequence` は再利用できません。`map()`、`flatMap()`、`scan()` による同一インスタンス上の型変更は静的解析できますが、変更前に保持した別名参照の型には解析上の制限があります。
 
 `collect()`、`associate()`、`fold()` と全件を読む Aggregator は、無限 source では終了しません。`until()` も一致する値がない無限 source では終了せず、`skipUntil()` も一致後に無限の残りがある場合は残りを全消費する終端処理では終了しません。必要に応じて先に `take()` で有限化します。
 
@@ -158,11 +169,11 @@ $usersCollection = $users
     |> aggregate(collectWith());
 ```
 
-`sequence()`、`map($mapper)`、`filter($predicate)`、`flatMap($mapper)`、`until($predicate)`、`skipUntil($predicate)`、`take($count)`、`drop($count)`、`collect()`、`fold($initial, $step)`、`aggregate($aggregator)`、`associate($keySelector)`、`getIterator()` は、それぞれ単一の入力を受け取る `Closure` を返します。factory の作成時には source や callback を実行せず、`take()` と `drop()` の負数検証も行いません。返した Closure を `Sequence` に適用した時点で対応するメソッドを直接呼ぶため、負数の拒否や消費済み入力の拒否はその適用時に発生します。
+`sequence()`、`map($mapper)`、`scan($initial, $step)`、`filter($predicate)`、`flatMap($mapper)`、`until($predicate)`、`skipUntil($predicate)`、`take($count)`、`drop($count)`、`collect()`、`fold($initial, $step)`、`aggregate($aggregator)`、`associate($keySelector)`、`getIterator()` は、それぞれ単一の入力を受け取る `Closure` を返します。factory の作成時には source や callback を実行せず、`take()` と `drop()` の負数検証も行いません。返した Closure を `Sequence` に適用した時点で対応するメソッドを直接呼ぶため、負数の拒否や消費済み入力の拒否はその適用時に発生します。
 
 中間操作は同じ mutable な `Sequence` を返し、source と callback の実行は終端処理まで遅延されます。`collect()`、`fold()`、`aggregate()`、`associate()` は適用時に消費し、`getIterator()` も適用した時点で Sequence を使用済みにします。各 Sequence は一度だけ消費できます。全件を読む終端処理には有限な出力が必要です。
 
-factory が返した Closure は複数の Sequence に適用できます。`take()` や `drop()` の進行状態が Sequence 間で共有されることはありません。一方、factory に渡した callback、その callback が捕捉した値、`fold()` の初期オブジェクトは複製されず、同じ値が再利用されます。
+factory が返した Closure は複数の Sequence に適用できます。`take()`、`drop()`、`scan()` の scalar な進行状態は Sequence ごとに独立します。一方、factory に渡した callback、その callback が捕捉した値、`fold()` の初期オブジェクト、`scan()` の object seed は複製されず、通常の PHP の参照共有に従って同じ値が再利用されます。
 
 ### 採用範囲
 

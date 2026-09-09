@@ -32,6 +32,18 @@ function map(callable $mapper): Closure
 
 /**
  * @template T
+ * @template S
+ * @param S $initial
+ * @param callable(S, T): S $step
+ * @return Closure(Sequence<T>): Sequence<S>
+ */
+function scan(mixed $initial, callable $step): Closure
+{
+    return static fn(Sequence $sequence): Sequence => $sequence->scan($initial, $step);
+}
+
+/**
+ * @template T
  * @param callable(T): bool $predicate
  * @return Closure(Sequence<T>): Sequence<T>
  */

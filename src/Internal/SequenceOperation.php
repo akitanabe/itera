@@ -17,6 +17,18 @@ final class SequenceOperation
     }
 
     /** @return Closure(mixed, int): SequenceStep */
+    public static function scan(mixed $initial, callable $step): Closure
+    {
+        $state = $initial;
+
+        return static function (mixed $value, int $_position) use ($step, &$state): SequenceStep {
+            $state = $step($state, $value);
+
+            return SequenceStep::forward($state);
+        };
+    }
+
+    /** @return Closure(mixed, int): SequenceStep */
     public static function filter(callable $predicate): Closure
     {
         return static fn(mixed $value, int $_position): SequenceStep => $predicate($value)

@@ -106,6 +106,28 @@ final class Sequence implements IteratorAggregate
     }
 
     /**
+     * Lazily emits each state after applying step to the previous state and
+     * the next input value. The initial state itself is never emitted.
+     *
+     * Static analysis updates the type of the receiver. References that alias
+     * the receiver before this call cannot reliably reflect that type change.
+     *
+     * @template S
+     * @param S $initial
+     * @param callable(S, T): S $step
+     * @return self<S>
+     * @phpstan-self-out self<S>
+     * @throws SequenceConsumedException If this sequence was already consumed.
+     */
+    public function scan(mixed $initial, callable $step): self
+    {
+        $this->assertNotConsumed();
+        $this->operations[] = SequenceOperation::scan($initial, $step);
+
+        return $this;
+    }
+
+    /**
      * Lazily retains values for which the predicate result is truthy.
      *
      * @param callable(T): bool $predicate
